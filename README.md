@@ -7,6 +7,8 @@ Before we get started on the README  - This project is a "RE"comp. It is NOT a "
 
 Please note this is an Open BETA and this is NOT the final version! This Recomp was made by human hands, no AI is involved in writing this code!
 
+We value human work, PRs made with AI will be closed.
+
 # Do You Just Want To Play?
 If you just want to play [download the latest release here](https://github.com/BlackLabelHQ/SymphonyRecomp/releases)!
 
