@@ -1,6 +1,7 @@
 using System;
 using Android.Content;
 using Android.Graphics;
+using Android.OS;
 using Android.Views;
 using RecompOne.Runtime.Hardware;
 
@@ -15,6 +16,7 @@ namespace RecompOne.SoTN.Android
     public class TouchOverlayView : View
     {
         public Action? OnMenuClicked;
+        public Action<bool>? OnVisibilityToggled;
         public float TouchOpacity = 0.7f;
         public bool TouchVisible = true;
         public TouchControlMode ControlMode = TouchControlMode.DPad;
@@ -23,129 +25,228 @@ namespace RecompOne.SoTN.Android
         private readonly Paint _strokePaint = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _textPaint = new Paint(PaintFlags.AntiAlias);
 
-        // Active pressed states for visual feedback
+        // Active pressed states, for visual feedback only.
         private bool _pUp, _pDown, _pLeft, _pRight;
         private bool _pTriangle, _pSquare, _pCircle, _pCross;
         private bool _pL1, _pL2, _pR1, _pR2;
-        private bool _pSelect, _pMenu, _pStart;
+        private bool _pSelect, _pMenu, _pStart, _pToggle;
 
-        // Joystick knob offset for drawing
-        private float _knobOffsetX = 0f;
-        private float _knobOffsetY = 0f;
+        private float _knobOffsetX, _knobOffsetY;
+
+        // Safe-area insets. The bottom row used to be drawn underneath the navigation
+        // bar in landscape, which is what clipped the d-pad and the SELECT/START row.
+        private int _insetL, _insetT, _insetR, _insetB;
 
         public TouchOverlayView(Context context) : base(context)
         {
             SetBackgroundColor(Color.Transparent);
         }
 
+        public override WindowInsets? OnApplyWindowInsets(WindowInsets? insets)
+        {
+            if (insets != null)
+            {
+                _insetL = insets.SystemWindowInsetLeft;
+                _insetT = insets.SystemWindowInsetTop;
+                _insetR = insets.SystemWindowInsetRight;
+                _insetB = insets.SystemWindowInsetBottom;
+                Invalidate();
+            }
+            return base.OnApplyWindowInsets(insets);
+        }
+
+        private void RefreshInsets()
+        {
+            // OnApplyWindowInsets is not guaranteed to have fired before the first draw,
+            // so read the current insets defensively too.
+            if (Build.VERSION.SdkInt < BuildVersionCodes.M) return;
+            try
+            {
+                var wi = RootWindowInsets;
+                if (wi == null) return;
+                _insetL = wi.SystemWindowInsetLeft;
+                _insetT = wi.SystemWindowInsetTop;
+                _insetR = wi.SystemWindowInsetRight;
+                _insetB = wi.SystemWindowInsetBottom;
+            }
+            catch
+            {
+            }
+        }
+
+        /// <summary>
+        /// Every rect the overlay draws and hit-tests. Computed in one place so the
+        /// touch targets can never drift away from what is painted on screen.
+        /// </summary>
+        private struct Layout
+        {
+            public float Density, Btn;
+            public RectF Up, Down, Left, Right;
+            public RectF Triangle, Cross, Square, Circle;
+            public RectF L1, L2, R1, R2;
+            public RectF Select, Start, Menu, Toggle;
+            public float DpadCX, DpadCY, DpadR;
+            public float ActCX, ActCY, ActR;
+        }
+
+        private Layout ComputeLayout()
+        {
+            RefreshInsets();
+
+            var l = new Layout();
+            float density = Context?.Resources?.DisplayMetrics?.Density ?? 1f;
+            l.Density = density;
+
+            int w = Width, h = Height;
+            bool isPortrait = h >= w;
+
+            float margin = 10f * density;
+            float left = _insetL + margin;
+            float top = _insetT + margin;
+            float right = w - _insetR - margin;
+            float bottom = h - _insetB - margin;
+            float availW = Math.Max(1f, right - left);
+            float availH = Math.Max(1f, bottom - top);
+
+            // Scale to the screen instead of using fixed dp, so the cluster always fits
+            // between the safe-area edges no matter how short the landscape window is.
+            float btn = Math.Clamp(MathF.Min(availW, availH) * 0.155f, 34f * density, 62f * density);
+            l.Btn = btn;
+
+            float cluster = btn * 3.0f;
+            float half = btn / 2f;
+            float gap = 8f * density;
+
+            // Movement cluster, bottom-left.
+            float dpadLeft = left;
+            float dpadTop = bottom - cluster;
+            l.DpadCX = dpadLeft + cluster / 2f;
+            l.DpadCY = dpadTop + cluster / 2f;
+            l.DpadR = cluster / 2f;
+
+            l.Up    = new RectF(l.DpadCX - half, dpadTop, l.DpadCX + half, dpadTop + btn);
+            l.Down  = new RectF(l.DpadCX - half, dpadTop + cluster - btn, l.DpadCX + half, dpadTop + cluster);
+            l.Left  = new RectF(dpadLeft, l.DpadCY - half, dpadLeft + btn, l.DpadCY + half);
+            l.Right = new RectF(dpadLeft + cluster - btn, l.DpadCY - half, dpadLeft + cluster, l.DpadCY + half);
+
+            // Action cluster, bottom-right.
+            float actLeft = right - cluster;
+            float actTop = bottom - cluster;
+            l.ActCX = actLeft + cluster / 2f;
+            l.ActCY = actTop + cluster / 2f;
+            l.ActR = cluster / 2f;
+
+            l.Triangle = new RectF(l.ActCX - half, actTop, l.ActCX + half, actTop + btn);
+            l.Cross    = new RectF(l.ActCX - half, actTop + cluster - btn, l.ActCX + half, actTop + cluster);
+            l.Square   = new RectF(actLeft, l.ActCY - half, actLeft + btn, l.ActCY + half);
+            l.Circle   = new RectF(actLeft + cluster - btn, l.ActCY - half, actLeft + cluster, l.ActCY + half);
+
+            // Shoulders sit directly above their cluster, keeping the top-right corner
+            // free for the menu and the hide toggle.
+            float shW = btn * 1.25f;
+            float shH = btn * 0.55f;
+            float shBottom = actTop - gap;
+            float shTop = shBottom - shH;
+
+            l.L1 = new RectF(left, shTop, left + shW, shBottom);
+            l.L2 = new RectF(left + shW + gap, shTop, left + shW * 2f + gap, shBottom);
+            l.R2 = new RectF(right - shW * 2f - gap, shTop, right - shW - gap, shBottom);
+            l.R1 = new RectF(right - shW, shTop, right, shBottom);
+
+            // SELECT / START. Landscape has a wide empty gap between the clusters, so
+            // they go bottom-centre; portrait does not, so they get their own row above
+            // the shoulders instead of overlapping them.
+            float sysW = btn * 1.5f;
+            float sysH = btn * 0.55f;
+            float sysCX = (left + right) / 2f;
+            float sysBottom = isPortrait ? shTop - gap : bottom;
+            float sysTop = sysBottom - sysH;
+
+            l.Select = new RectF(sysCX - sysW - gap / 2f, sysTop, sysCX - gap / 2f, sysBottom);
+            l.Start  = new RectF(sysCX + gap / 2f, sysTop, sysCX + sysW + gap / 2f, sysBottom);
+
+            // Menu and the hide/show toggle, top-right in both orientations.
+            float menuW = btn * 1.5f;
+            float menuH = btn * 0.55f;
+            float togW = btn * 1.15f;
+
+            l.Menu = new RectF(right - menuW, top, right, top + menuH);
+            l.Toggle = new RectF(l.Menu.Left - gap - togW, top, l.Menu.Left - gap, top + menuH);
+
+            return l;
+        }
+
         public override bool OnTouchEvent(MotionEvent? e)
         {
-            if (e == null || !TouchVisible) return base.OnTouchEvent(e);
+            if (e == null) return false;
+
+            var l = ComputeLayout();
+            if (Width <= 0 || Height <= 0) return false;
 
             int action = (int)e.ActionMasked;
             int actionIndex = e.ActionIndex;
-
-            bool menuTriggered = false;
+            bool isDownAction = action == (int)MotionEventActions.Down || action == (int)MotionEventActions.PointerDown;
 
             bool pUp = false, pDown = false, pLeft = false, pRight = false;
             bool pTriangle = false, pSquare = false, pCircle = false, pCross = false;
             bool pL1 = false, pL2 = false, pR1 = false, pR2 = false;
-            bool pSelect = false, pMenu = false, pStart = false;
+            bool pSelect = false, pMenu = false, pStart = false, pToggle = false;
 
-            float knobX = 0f, knobY = 0f;
+            bool menuTriggered = false, toggleTriggered = false;
             bool joystickActive = false;
-
-            float density = Context?.Resources?.DisplayMetrics?.Density ?? 1f;
-            int w = Width;
-            int h = Height;
-            if (w <= 0 || h <= 0) return true;
-
-            bool isPortrait = Context?.Resources?.Configuration?.Orientation == global::Android.Content.Res.Orientation.Portrait;
-
-            // Geometry calculations
-            float btnDp = isPortrait ? 52f : 58f;
-            float btnPx = btnDp * density;
-            float padPx = 15f * density;
-
-            // D-Pad / Joystick center
-            float dpadW = btnPx * 3.1f;
-            float dpadLeft = padPx;
-            float dpadBottom = isPortrait ? (56f * density) : padPx;
-            float dpadY = h - dpadBottom - dpadW;
-            float dpadCenterX = dpadLeft + dpadW / 2f;
-            float dpadCenterY = dpadY + dpadW / 2f;
-            float dpadRadius = dpadW / 2f;
-
-            // Action Buttons center
-            float actionW = btnPx * 3.1f;
-            float actionRight = padPx;
-            float actionBottom = isPortrait ? (56f * density) : padPx;
-            float actionX = w - actionRight - actionW;
-            float actionY = h - actionBottom - actionW;
-            float actionCenterX = actionX + actionW / 2f;
-            float actionCenterY = actionY + actionW / 2f;
-            float actionRadius = actionW / 2f;
-
-            // Shoulders
-            float shW = (isPortrait ? 58f : 65f) * density;
-            float shH = (isPortrait ? 34f : 38f) * density;
-            float shBottom = isPortrait ? (btnPx * 3.1f + 62f * density) : (h - (10f * density) - shH);
-
-            RectF rectL1 = isPortrait 
-                ? new RectF(padPx, h - shBottom - shH, padPx + shW, h - shBottom)
-                : new RectF(padPx, 10f * density, padPx + shW, 10f * density + shH);
-
-            RectF rectL2 = isPortrait
-                ? new RectF(padPx + shW + 6f * density, h - shBottom - shH, padPx + shW * 2 + 6f * density, h - shBottom)
-                : new RectF(padPx + shW + 8f * density, 10f * density, padPx + shW * 2 + 8f * density, 10f * density + shH);
-
-            RectF rectR1 = isPortrait
-                ? new RectF(w - padPx - shW * 2 - 6f * density, h - shBottom - shH, w - padPx - shW - 6f * density, h - shBottom)
-                : new RectF(w - padPx - shW, 10f * density, w - padPx, 10f * density + shH);
-
-            RectF rectR2 = isPortrait
-                ? new RectF(w - padPx - shW, h - shBottom - shH, w - padPx, h - shBottom)
-                : new RectF(w - padPx - shW * 2 - 8f * density, 10f * density, w - padPx - shW - 8f * density, 10f * density + shH);
-
-            // System buttons (Select, Menu, Start)
-            float sysW = 68f * density;
-            float sysMenuW = 82f * density;
-            float sysH = 34f * density;
-            float sysBottom = 10f * density;
-            float sysTotalW = sysW + sysMenuW + sysW + 16f * density;
-            float sysStartX = (w - sysTotalW) / 2f;
-            float sysY = h - sysBottom - sysH;
-
-            RectF rectSelect = new RectF(sysStartX, sysY, sysStartX + sysW, sysY + sysH);
-            RectF rectMenu = new RectF(sysStartX + sysW + 8f * density, sysY, sysStartX + sysW + 8f * density + sysMenuW, sysY + sysH);
-            RectF rectStart = new RectF(sysStartX + sysW + sysMenuW + 16f * density, sysY, sysStartX + sysW + sysMenuW + 16f * density + sysW, sysY + sysH);
+            float knobX = 0f, knobY = 0f;
+            bool hitAnything = false;
 
             for (int i = 0; i < e.PointerCount; i++)
             {
-                if ((action == (int)MotionEventActions.PointerUp || action == (int)MotionEventActions.Up || action == (int)MotionEventActions.Cancel) && i == actionIndex)
+                // The pointer named by an UP/CANCEL action is leaving, so it must not
+                // count as held.
+                if ((action == (int)MotionEventActions.PointerUp ||
+                     action == (int)MotionEventActions.Up ||
+                     action == (int)MotionEventActions.Cancel) && i == actionIndex)
                     continue;
 
                 float px = e.GetX(i);
                 float py = e.GetY(i);
 
-                // 1. Movement hit test (D-Pad or Virtual Joystick)
-                float dx = px - dpadCenterX;
-                float dy = py - dpadCenterY;
+                if (l.Menu.Contains(px, py))
+                {
+                    pMenu = true;
+                    hitAnything = true;
+                    if (isDownAction) menuTriggered = true;
+                    continue;
+                }
+
+                if (l.Toggle.Contains(px, py))
+                {
+                    pToggle = true;
+                    hitAnything = true;
+                    if (isDownAction) toggleTriggered = true;
+                    continue;
+                }
+
+                // Everything below is a game control, so it is inert while hidden.
+                if (!TouchVisible) continue;
+
+                hitAnything = true;
+
+                float dx = px - l.DpadCX;
+                float dy = py - l.DpadCY;
                 float dist = MathF.Sqrt(dx * dx + dy * dy);
 
                 if (ControlMode == TouchControlMode.VirtualJoystick)
                 {
-                    if (dist <= dpadRadius * 1.6f)
+                    if (dist <= l.DpadR * 1.6f)
                     {
                         joystickActive = true;
-                        float maxDrag = dpadRadius * 0.75f;
-                        float clampedDist = MathF.Min(dist, maxDrag);
-                        float angleRad = MathF.Atan2(dy, dx);
-                        knobX = MathF.Cos(angleRad) * clampedDist;
-                        knobY = MathF.Sin(angleRad) * clampedDist;
+                        float maxDrag = l.DpadR * 0.75f;
+                        float clamped = MathF.Min(dist, maxDrag);
+                        float angle = MathF.Atan2(dy, dx);
+                        knobX = MathF.Cos(angle) * clamped;
+                        knobY = MathF.Sin(angle) * clamped;
 
-                        float normX = dist > 0f ? (dx / dist) * (clampedDist / maxDrag) : 0f;
-                        float normY = dist > 0f ? (dy / dist) * (clampedDist / maxDrag) : 0f;
+                        float normX = dist > 0f ? (dx / dist) * (clamped / maxDrag) : 0f;
+                        float normY = dist > 0f ? (dy / dist) * (clamped / maxDrag) : 0f;
 
                         if (normX < -0.3f) pLeft = true;
                         if (normX > 0.3f) pRight = true;
@@ -156,72 +257,53 @@ namespace RecompOne.SoTN.Android
                         Controller.LeftY = (byte)Math.Clamp(128 + (int)(normY * 127f), 0, 255);
                     }
                 }
-                else
+                else if (dist <= l.DpadR * 1.4f && dist > 4f * l.Density)
                 {
-                    // D-Pad (Four Arrows)
-                    if (dist <= dpadRadius * 1.4f && dist > 4f * density)
-                    {
-                        double angle = Math.Atan2(dy, dx) * (180.0 / Math.PI); // -180 to 180
-                        if (angle >= -67.5 && angle <= 67.5) pRight = true;
-                        if (angle >= 22.5 && angle <= 157.5) pDown = true;
-                        if (angle >= 112.5 || angle <= -112.5) pLeft = true;
-                        if (angle >= -157.5 && angle <= -22.5) pUp = true;
-                    }
+                    // Angular sectors, so diagonals press two directions at once.
+                    double deg = Math.Atan2(dy, dx) * (180.0 / Math.PI);
+                    if (deg >= -67.5 && deg <= 67.5) pRight = true;
+                    if (deg >= 22.5 && deg <= 157.5) pDown = true;
+                    if (deg >= 112.5 || deg <= -112.5) pLeft = true;
+                    if (deg >= -157.5 && deg <= -22.5) pUp = true;
                 }
 
-                // 2. Action Buttons hit test
-                float ax = px - actionCenterX;
-                float ay = py - actionCenterY;
-                float aDist = MathF.Sqrt(ax * ax + ay * ay);
-
-                if (aDist <= actionRadius * 1.4f)
+                float ax = px - l.ActCX;
+                float ay = py - l.ActCY;
+                if (MathF.Sqrt(ax * ax + ay * ay) <= l.ActR * 1.4f)
                 {
-                    float subR = btnPx * 0.6f;
-                    // Triangle (Up)
-                    if (MathF.Sqrt(ax * ax + (ay + btnPx * 0.9f) * (ay + btnPx * 0.9f)) <= subR || (ay < -btnPx * 0.3f && MathF.Abs(ax) < btnPx * 0.85f))
+                    float sub = l.Btn * 0.6f;
+                    float o = l.Btn * 0.9f;
+                    if (MathF.Sqrt(ax * ax + (ay + o) * (ay + o)) <= sub || (ay < -l.Btn * 0.3f && MathF.Abs(ax) < l.Btn * 0.85f))
                         pTriangle = true;
-
-                    // Cross (Down)
-                    if (MathF.Sqrt(ax * ax + (ay - btnPx * 0.9f) * (ay - btnPx * 0.9f)) <= subR || (ay > btnPx * 0.3f && MathF.Abs(ax) < btnPx * 0.85f))
+                    if (MathF.Sqrt(ax * ax + (ay - o) * (ay - o)) <= sub || (ay > l.Btn * 0.3f && MathF.Abs(ax) < l.Btn * 0.85f))
                         pCross = true;
-
-                    // Square (Left)
-                    if (MathF.Sqrt((ax + btnPx * 0.9f) * (ax + btnPx * 0.9f) + ay * ay) <= subR || (ax < -btnPx * 0.3f && MathF.Abs(ay) < btnPx * 0.85f))
+                    if (MathF.Sqrt((ax + o) * (ax + o) + ay * ay) <= sub || (ax < -l.Btn * 0.3f && MathF.Abs(ay) < l.Btn * 0.85f))
                         pSquare = true;
-
-                    // Circle (Right)
-                    if (MathF.Sqrt((ax - btnPx * 0.9f) * (ax - btnPx * 0.9f) + ay * ay) <= subR || (ax > btnPx * 0.3f && MathF.Abs(ay) < btnPx * 0.85f))
+                    if (MathF.Sqrt((ax - o) * (ax - o) + ay * ay) <= sub || (ax > l.Btn * 0.3f && MathF.Abs(ay) < l.Btn * 0.85f))
                         pCircle = true;
                 }
 
-                // 3. Shoulders
-                if (rectL1.Contains(px, py)) pL1 = true;
-                if (rectL2.Contains(px, py)) pL2 = true;
-                if (rectR1.Contains(px, py)) pR1 = true;
-                if (rectR2.Contains(px, py)) pR2 = true;
+                if (l.L1.Contains(px, py)) pL1 = true;
+                if (l.L2.Contains(px, py)) pL2 = true;
+                if (l.R1.Contains(px, py)) pR1 = true;
+                if (l.R2.Contains(px, py)) pR2 = true;
+                if (l.Select.Contains(px, py)) pSelect = true;
+                if (l.Start.Contains(px, py)) pStart = true;
+            }
 
-                // 4. System buttons
-                if (rectSelect.Contains(px, py)) pSelect = true;
-                if (rectStart.Contains(px, py)) pStart = true;
-                if (rectMenu.Contains(px, py))
+            if (ControlMode == TouchControlMode.VirtualJoystick)
+            {
+                if (joystickActive)
                 {
-                    pMenu = true;
-                    if (action == (int)MotionEventActions.Down || action == (int)MotionEventActions.PointerDown)
-                        menuTriggered = true;
+                    _knobOffsetX = knobX;
+                    _knobOffsetY = knobY;
                 }
-            }
-
-            if (!joystickActive && ControlMode == TouchControlMode.VirtualJoystick)
-            {
-                _knobOffsetX = 0f;
-                _knobOffsetY = 0f;
-                Controller.LeftX = 128;
-                Controller.LeftY = 128;
-            }
-            else if (joystickActive)
-            {
-                _knobOffsetX = knobX;
-                _knobOffsetY = knobY;
+                else
+                {
+                    _knobOffsetX = _knobOffsetY = 0f;
+                    Controller.LeftX = 128;
+                    Controller.LeftY = 128;
+                }
             }
             else
             {
@@ -229,13 +311,13 @@ namespace RecompOne.SoTN.Android
                 Controller.LeftY = pUp ? (byte)0 : pDown ? (byte)255 : (byte)128;
             }
 
-            // Update pressed states for rendering
             _pUp = pUp; _pDown = pDown; _pLeft = pLeft; _pRight = pRight;
             _pTriangle = pTriangle; _pSquare = pSquare; _pCircle = pCircle; _pCross = pCross;
             _pL1 = pL1; _pL2 = pL2; _pR1 = pR1; _pR2 = pR2;
-            _pSelect = pSelect; _pMenu = pMenu; _pStart = pStart;
+            _pSelect = pSelect; _pMenu = pMenu; _pStart = pStart; _pToggle = pToggle;
 
-            // Apply controller bits atomically to Controller.State (active LOW: 0 = pressed, 1 = unpressed)
+            // Active low: 0 = pressed. Published as the host's own channel so it composes
+            // with the physical pad instead of overwriting it.
             ushort state = 0xFFFF;
             if (pUp) state &= unchecked((ushort)~Controller.Up);
             if (pDown) state &= unchecked((ushort)~Controller.Down);
@@ -252,182 +334,127 @@ namespace RecompOne.SoTN.Android
             if (pSelect) state &= unchecked((ushort)~Controller.Select);
             if (pStart) state &= unchecked((ushort)~Controller.Start);
 
-            Controller.State = state;
+            Controller.SetExternalState(state);
+
+            if (toggleTriggered)
+            {
+                TouchVisible = !TouchVisible;
+                if (!TouchVisible) Controller.SetExternalState(0xFFFF);
+                OnVisibilityToggled?.Invoke(TouchVisible);
+            }
+
+            Invalidate();
 
             if (menuTriggered) OnMenuClicked?.Invoke();
 
-            Invalidate();
-            return true;
+            // While hidden, let touches that missed our two buttons fall through.
+            return TouchVisible || hitAnything;
         }
 
         protected override void OnDraw(Canvas? canvas)
         {
             base.OnDraw(canvas);
-            if (canvas == null || !TouchVisible) return;
+            if (canvas == null || Width <= 0 || Height <= 0) return;
 
-            float density = Context?.Resources?.DisplayMetrics?.Density ?? 1f;
-            int w = Width;
-            int h = Height;
-            if (w <= 0 || h <= 0) return;
-
-            bool isPortrait = Context?.Resources?.Configuration?.Orientation == global::Android.Content.Res.Orientation.Portrait;
-
-            float btnDp = isPortrait ? 52f : 58f;
-            float btnPx = btnDp * density;
-            float padPx = 15f * density;
+            var l = ComputeLayout();
+            float density = l.Density;
 
             int alphaNorm = (int)(128 * TouchOpacity);
             int alphaHigh = (int)(220 * TouchOpacity);
 
-            void DrawBtn(RectF rect, string label, Color textColor, bool pressed, float cornerRadius = 25f)
+            void DrawBtn(RectF rect, string label, Color textColor, bool pressed, float textDp = 14f, float cornerDp = 25f)
             {
                 _fillPaint.Color = pressed ? Color.Argb(alphaHigh, 100, 100, 240) : Color.Argb(alphaNorm, 40, 40, 40);
-                canvas.DrawRoundRect(rect, cornerRadius * density, cornerRadius * density, _fillPaint);
+                canvas.DrawRoundRect(rect, cornerDp * density, cornerDp * density, _fillPaint);
 
                 _strokePaint.Color = pressed ? Color.White : Color.Argb(180, 200, 200, 200);
                 _strokePaint.SetStyle(Paint.Style.Stroke);
                 _strokePaint.StrokeWidth = 1.5f * density;
-                canvas.DrawRoundRect(rect, cornerRadius * density, cornerRadius * density, _strokePaint);
+                canvas.DrawRoundRect(rect, cornerDp * density, cornerDp * density, _strokePaint);
 
                 _textPaint.Color = textColor;
-                _textPaint.TextSize = 14f * density;
+                _textPaint.TextSize = textDp * density;
                 _textPaint.TextAlign = Paint.Align.Center;
-
-                Paint.FontMetrics fm = _textPaint.GetFontMetrics();
-                float textY = rect.CenterY() - (fm.Ascent + fm.Descent) / 2f;
-                canvas.DrawText(label, rect.CenterX(), textY, _textPaint);
+                var fm = _textPaint.GetFontMetrics();
+                canvas.DrawText(label, rect.CenterX(), rect.CenterY() - (fm.Ascent + fm.Descent) / 2f, _textPaint);
             }
 
-            // 1. Movement Controls (D-Pad or Virtual Joystick)
-            float dpadW = btnPx * 3.1f;
-            float dpadLeft = padPx;
-            float dpadBottom = isPortrait ? (56f * density) : padPx;
-            float dpadY = h - dpadBottom - dpadW;
-
-            float dpadCenterX = dpadLeft + dpadW / 2f;
-            float dpadCenterY = dpadY + dpadW / 2f;
-            float dpadRadius = dpadW / 2f;
-
-            if (ControlMode == TouchControlMode.VirtualJoystick)
+            if (TouchVisible)
             {
-                // Draw Base Circle
-                _fillPaint.Color = Color.Argb(alphaNorm, 30, 30, 30);
-                canvas.DrawCircle(dpadCenterX, dpadCenterY, dpadRadius, _fillPaint);
+                if (ControlMode == TouchControlMode.VirtualJoystick)
+                {
+                    _fillPaint.Color = Color.Argb(alphaNorm, 30, 30, 30);
+                    canvas.DrawCircle(l.DpadCX, l.DpadCY, l.DpadR, _fillPaint);
 
-                _strokePaint.Color = Color.Argb(180, 200, 200, 200);
-                _strokePaint.SetStyle(Paint.Style.Stroke);
-                _strokePaint.StrokeWidth = 2f * density;
-                canvas.DrawCircle(dpadCenterX, dpadCenterY, dpadRadius, _strokePaint);
+                    _strokePaint.Color = Color.Argb(180, 200, 200, 200);
+                    _strokePaint.SetStyle(Paint.Style.Stroke);
+                    _strokePaint.StrokeWidth = 2f * density;
+                    canvas.DrawCircle(l.DpadCX, l.DpadCY, l.DpadR, _strokePaint);
 
-                // Inner Guide Cross Ring
-                _strokePaint.Color = Color.Argb(100, 150, 150, 150);
-                _strokePaint.StrokeWidth = 1f * density;
-                canvas.DrawCircle(dpadCenterX, dpadCenterY, dpadRadius * 0.4f, _strokePaint);
+                    _strokePaint.Color = Color.Argb(100, 150, 150, 150);
+                    _strokePaint.StrokeWidth = 1f * density;
+                    canvas.DrawCircle(l.DpadCX, l.DpadCY, l.DpadR * 0.4f, _strokePaint);
 
-                // Floating Stick Knob
-                float kx = dpadCenterX + _knobOffsetX;
-                float ky = dpadCenterY + _knobOffsetY;
-                float knobR = btnPx * 0.6f;
+                    float kx = l.DpadCX + _knobOffsetX;
+                    float ky = l.DpadCY + _knobOffsetY;
+                    float knobR = l.Btn * 0.6f;
+                    bool active = _knobOffsetX != 0f || _knobOffsetY != 0f;
 
-                bool active = (_knobOffsetX != 0f || _knobOffsetY != 0f);
-                _fillPaint.Color = active ? Color.Argb(alphaHigh, 80, 140, 255) : Color.Argb(alphaHigh, 70, 70, 70);
-                canvas.DrawCircle(kx, ky, knobR, _fillPaint);
+                    _fillPaint.Color = active ? Color.Argb(alphaHigh, 80, 140, 255) : Color.Argb(alphaHigh, 70, 70, 70);
+                    canvas.DrawCircle(kx, ky, knobR, _fillPaint);
 
-                _strokePaint.Color = Color.White;
-                _strokePaint.StrokeWidth = 2f * density;
-                canvas.DrawCircle(kx, ky, knobR, _strokePaint);
+                    _strokePaint.Color = Color.White;
+                    _strokePaint.StrokeWidth = 2f * density;
+                    canvas.DrawCircle(kx, ky, knobR, _strokePaint);
+                }
+                else
+                {
+                    DrawBtn(l.Up, "▲", Color.White, _pUp);
+                    DrawBtn(l.Down, "▼", Color.White, _pDown);
+                    DrawBtn(l.Left, "◄", Color.White, _pLeft);
+                    DrawBtn(l.Right, "►", Color.White, _pRight);
+                }
+
+                DrawBtn(l.Triangle, "Δ", Color.Rgb(60, 220, 100), _pTriangle);
+                DrawBtn(l.Square, "□", Color.Rgb(240, 100, 180), _pSquare);
+                DrawBtn(l.Circle, "O", Color.Rgb(240, 60, 60), _pCircle);
+                DrawBtn(l.Cross, "X", Color.Rgb(80, 140, 240), _pCross);
+
+                DrawBtn(l.L1, "L1", Color.White, _pL1, 13f, 15f);
+                DrawBtn(l.L2, "L2", Color.White, _pL2, 13f, 15f);
+                DrawBtn(l.R1, "R1", Color.White, _pR1, 13f, 15f);
+                DrawBtn(l.R2, "R2", Color.White, _pR2, 13f, 15f);
+
+                DrawBtn(l.Select, "SELECT", Color.White, _pSelect, 12f, 15f);
+                DrawBtn(l.Start, "START", Color.White, _pStart, 12f, 15f);
             }
-            else
-            {
-                // Classic D-Pad (Four Arrows)
-                RectF rUp = new RectF(dpadCenterX - btnPx / 2f, dpadY, dpadCenterX + btnPx / 2f, dpadY + btnPx);
-                RectF rDown = new RectF(dpadCenterX - btnPx / 2f, dpadY + dpadW - btnPx, dpadCenterX + btnPx / 2f, dpadY + dpadW);
-                RectF rLeft = new RectF(dpadLeft, dpadCenterY - btnPx / 2f, dpadLeft + btnPx, dpadCenterY + btnPx / 2f);
-                RectF rRight = new RectF(dpadLeft + dpadW - btnPx, dpadCenterY - btnPx / 2f, dpadLeft + dpadW, dpadCenterY + btnPx / 2f);
 
-                DrawBtn(rUp, "▲", Color.White, _pUp);
-                DrawBtn(rDown, "▼", Color.White, _pDown);
-                DrawBtn(rLeft, "◄", Color.White, _pLeft);
-                DrawBtn(rRight, "►", Color.White, _pRight);
-            }
+            // Menu and the hide/show toggle stay on screen even when the controls are
+            // hidden, otherwise there would be no way to bring them back.
+            // Plain text rather than emoji: colour-emoji glyphs fall back to tofu boxes
+            // on some devices' default Paint typeface.
+            DrawAccented(canvas, l.Menu, "⚙ MENU", Color.Yellow, _pMenu, 12f, density, alphaHigh);
+            DrawAccented(canvas, l.Toggle, TouchVisible ? "HIDE" : "SHOW", Color.Cyan, _pToggle, 12f, density, alphaHigh);
+        }
 
-            // 2. Action Buttons
-            float actionW = btnPx * 3.1f;
-            float actionRight = padPx;
-            float actionBottom = isPortrait ? (56f * density) : padPx;
-            float actionX = w - actionRight - actionW;
-            float actionY = h - actionBottom - actionW;
+        private void DrawAccented(Canvas canvas, RectF rect, string label, Color accent, bool pressed,
+                                  float textDp, float density, int alphaHigh)
+        {
+            _fillPaint.Color = pressed
+                ? Color.Argb(alphaHigh, 120, 120, 40)
+                : Color.Argb((int)(180 * TouchOpacity), 20, 20, 20);
+            canvas.DrawRoundRect(rect, 15f * density, 15f * density, _fillPaint);
 
-            float actionCenterX = actionX + actionW / 2f;
-            float actionCenterY = actionY + actionW / 2f;
-
-            RectF rTriangle = new RectF(actionCenterX - btnPx / 2f, actionY, actionCenterX + btnPx / 2f, actionY + btnPx);
-            RectF rCross = new RectF(actionCenterX - btnPx / 2f, actionY + actionW - btnPx, actionCenterX + btnPx / 2f, actionY + actionW);
-            RectF rSquare = new RectF(actionX, actionCenterY - btnPx / 2f, actionX + btnPx, actionCenterY + btnPx / 2f);
-            RectF rCircle = new RectF(actionX + actionW - btnPx, actionCenterY - btnPx / 2f, actionX + actionW, actionCenterY + btnPx / 2f);
-
-            DrawBtn(rTriangle, "Δ", Color.Rgb(60, 220, 100), _pTriangle);
-            DrawBtn(rSquare, "□", Color.Rgb(240, 100, 180), _pSquare);
-            DrawBtn(rCircle, "O", Color.Rgb(240, 60, 60), _pCircle);
-            DrawBtn(rCross, "X", Color.Rgb(80, 140, 240), _pCross);
-
-            // 3. Shoulders
-            float shW = (isPortrait ? 58f : 65f) * density;
-            float shH = (isPortrait ? 34f : 38f) * density;
-            float shBottom = isPortrait ? (btnPx * 3.1f + 62f * density) : (h - (10f * density) - shH);
-
-            RectF rectL1 = isPortrait
-                ? new RectF(padPx, h - shBottom - shH, padPx + shW, h - shBottom)
-                : new RectF(padPx, 10f * density, padPx + shW, 10f * density + shH);
-
-            RectF rectL2 = isPortrait
-                ? new RectF(padPx + shW + 6f * density, h - shBottom - shH, padPx + shW * 2 + 6f * density, h - shBottom)
-                : new RectF(padPx + shW + 8f * density, 10f * density, padPx + shW * 2 + 8f * density, 10f * density + shH);
-
-            RectF rectR1 = isPortrait
-                ? new RectF(w - padPx - shW * 2 - 6f * density, h - shBottom - shH, w - padPx - shW - 6f * density, h - shBottom)
-                : new RectF(w - padPx - shW, 10f * density, w - padPx, 10f * density + shH);
-
-            RectF rectR2 = isPortrait
-                ? new RectF(w - padPx - shW, h - shBottom - shH, w - padPx, h - shBottom)
-                : new RectF(w - padPx - shW * 2 - 8f * density, 10f * density, w - padPx - shW - 8f * density, 10f * density + shH);
-
-            DrawBtn(rectL1, "L1", Color.White, _pL1, 15f);
-            DrawBtn(rectL2, "L2", Color.White, _pL2, 15f);
-            DrawBtn(rectR1, "R1", Color.White, _pR1, 15f);
-            DrawBtn(rectR2, "R2", Color.White, _pR2, 15f);
-
-            // 4. System buttons
-            float sysW = 68f * density;
-            float sysMenuW = 82f * density;
-            float sysH = 34f * density;
-            float sysBottom = 10f * density;
-            float sysTotalW = sysW + sysMenuW + sysW + 16f * density;
-            float sysStartX = (w - sysTotalW) / 2f;
-            float sysY = h - sysBottom - sysH;
-
-            RectF rectSelect = new RectF(sysStartX, sysY, sysStartX + sysW, sysY + sysH);
-            RectF rectMenu = new RectF(sysStartX + sysW + 8f * density, sysY, sysStartX + sysW + 8f * density + sysMenuW, sysY + sysH);
-            RectF rectStart = new RectF(sysStartX + sysW + sysMenuW + 16f * density, sysY, sysStartX + sysW + sysMenuW + 16f * density + sysW, sysY + sysH);
-
-            DrawBtn(rectSelect, "SELECT", Color.White, _pSelect, 15f);
-            DrawBtn(rectStart, "START", Color.White, _pStart, 15f);
-
-            // Menu button with yellow highlight
-            _fillPaint.Color = _pMenu ? Color.Argb(alphaHigh, 120, 120, 40) : Color.Argb((int)(180 * TouchOpacity), 20, 20, 20);
-            canvas.DrawRoundRect(rectMenu, 15f * density, 15f * density, _fillPaint);
-
-            _strokePaint.Color = Color.Yellow;
+            _strokePaint.Color = accent;
             _strokePaint.SetStyle(Paint.Style.Stroke);
             _strokePaint.StrokeWidth = 1.5f * density;
-            canvas.DrawRoundRect(rectMenu, 15f * density, 15f * density, _strokePaint);
+            canvas.DrawRoundRect(rect, 15f * density, 15f * density, _strokePaint);
 
-            _textPaint.Color = Color.Yellow;
-            _textPaint.TextSize = 12f * density;
+            _textPaint.Color = accent;
+            _textPaint.TextSize = textDp * density;
             _textPaint.TextAlign = Paint.Align.Center;
-            Paint.FontMetrics fmMenu = _textPaint.GetFontMetrics();
-            float textYMenu = rectMenu.CenterY() - (fmMenu.Ascent + fmMenu.Descent) / 2f;
-            canvas.DrawText("⚙ MENU", rectMenu.CenterX(), textYMenu, _textPaint);
+            var fm = _textPaint.GetFontMetrics();
+            canvas.DrawText(label, rect.CenterX(), rect.CenterY() - (fm.Ascent + fm.Descent) / 2f, _textPaint);
         }
     }
 }

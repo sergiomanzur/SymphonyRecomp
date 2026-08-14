@@ -82,88 +82,19 @@ namespace RecompOne.SoTN.Android
 
         // --- RETROID POCKET, BLUETOOTH & WIRED CONTROLLER INPUT HANDLING ---
 
+        // Physical controllers are handled by the runtime's InputManager, which polls SDL
+        // every frame. We deliberately do NOT mirror them here from Android KeyEvents:
+        // the SDL view and this activity each only see the events the other did not
+        // consume, so a DOWN could arrive without its matching UP and latch a button on
+        // forever. Polling is self-correcting; event mirroring is not.
         public override bool OnKeyDown(Keycode keyCode, KeyEvent? e)
         {
-            if (HandleGamepadButton(keyCode, isDown: true)) return true;
             if (keyCode == Keycode.Back || keyCode == Keycode.Menu)
             {
                 ShowMenuDialog();
                 return true;
             }
             return base.OnKeyDown(keyCode, e);
-        }
-
-        public override bool OnKeyUp(Keycode keyCode, KeyEvent? e)
-        {
-            if (HandleGamepadButton(keyCode, isDown: false)) return true;
-            return base.OnKeyUp(keyCode, e);
-        }
-
-        public override bool OnGenericMotionEvent(MotionEvent? e)
-        {
-            if (e != null && HandleGamepadAxis(e)) return true;
-            return base.OnGenericMotionEvent(e);
-        }
-
-        private bool HandleGamepadButton(Keycode keyCode, bool isDown)
-        {
-            ushort mask = keyCode switch
-            {
-                Keycode.ButtonA => Controller.Cross,
-                Keycode.ButtonB => Controller.Circle,
-                Keycode.ButtonX => Controller.Square,
-                Keycode.ButtonY => Controller.Triangle,
-                Keycode.ButtonL1 => Controller.L1,
-                Keycode.ButtonR1 => Controller.R1,
-                Keycode.ButtonL2 => Controller.L2,
-                Keycode.ButtonR2 => Controller.R2,
-                Keycode.ButtonStart => Controller.Start,
-                Keycode.ButtonSelect => Controller.Select,
-                Keycode.DpadUp => Controller.Up,
-                Keycode.DpadDown => Controller.Down,
-                Keycode.DpadLeft => Controller.Left,
-                Keycode.DpadRight => Controller.Right,
-                _ => 0
-            };
-
-            if (mask != 0)
-            {
-                SetControllerBit(mask, isDown);
-                return true;
-            }
-            return false;
-        }
-
-        private bool HandleGamepadAxis(MotionEvent e)
-        {
-            float hx = e.GetAxisValue(Axis.HatX);
-            float hy = e.GetAxisValue(Axis.HatY);
-            float lx = e.GetAxisValue(Axis.X);
-            float ly = e.GetAxisValue(Axis.Y);
-            float lt = e.GetAxisValue(Axis.Ltrigger);
-            float rt = e.GetAxisValue(Axis.Rtrigger);
-
-            bool left = hx < -0.5f || lx < -0.5f;
-            bool right = hx > 0.5f || lx > 0.5f;
-            bool up = hy < -0.5f || ly < -0.5f;
-            bool down = hy > 0.5f || ly > 0.5f;
-            bool l2 = lt > 0.5f;
-            bool r2 = rt > 0.5f;
-
-            SetControllerBit(Controller.Left, left);
-            SetControllerBit(Controller.Right, right);
-            SetControllerBit(Controller.Up, up);
-            SetControllerBit(Controller.Down, down);
-            SetControllerBit(Controller.L2, l2);
-            SetControllerBit(Controller.R2, r2);
-
-            return left || right || up || down || l2 || r2;
-        }
-
-        private static void SetControllerBit(ushort mask, bool pressed)
-        {
-            if (pressed) Controller.State &= unchecked((ushort)~mask);
-            else Controller.State |= mask;
         }
 
         // --- TOUCH OVERLAY CREATION (PSX LAYOUT) ---
@@ -173,7 +104,9 @@ namespace RecompOne.SoTN.Android
             base.OnPause();
             Console.WriteLine("[Android] MainActivity OnPause - pausing audio and resetting controls.");
             Audio.Pause();
-            Controller.State = 0xFFFF; // Clear all active inputs on pause
+            // Release every on-screen button. The physical pad is polled from SDL, so it
+            // reports its own real state again on resume and needs no reset here.
+            Controller.SetExternalState(0xFFFF);
         }
 
         protected override void OnResume()
@@ -204,7 +137,9 @@ namespace RecompOne.SoTN.Android
                         TouchOpacity = _touchOpacity,
                         TouchVisible = _touchVisible,
                         ControlMode = (TouchControlMode)ConfigManager.View.TouchControlMode,
-                        OnMenuClicked = ShowMenuDialog
+                        OnMenuClicked = ShowMenuDialog,
+                        // Keep the settings dialog's label in step with the on-screen toggle.
+                        OnVisibilityToggled = visible => _touchVisible = visible
                     };
 
                     var paramsMatch = new ViewGroup.LayoutParams(
