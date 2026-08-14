@@ -296,26 +296,22 @@ namespace RecompOne.SoTN.Android
                 GpuHle.NotifyDisplay(gpu.DisplayX, gpu.DisplayY, gpu.DisplayWidth, gpu.DisplayHeight);
                 GpuHle.Backend?.WriteVram(0, 0, 1024, 512, gpu.Vram);
 
-                // Silence voices left over from before the load - but do NOT call Spu.Reset().
+                // Deliberately do not touch the SPU or XA here.
                 //
-                // Reset() zeroes the SPU main volume (_mainVolL/R and _mainCurL/R), SPUCNT and
-                // the CD volume. The mixer multiplies the final mix by _mainCurL/R, and the game
-                // only writes those registers during its init - none of them are part of the
-                // savestate, so nothing ever restores them and the game goes permanently silent
-                // after a load. Keying every voice off gives the intended "don't carry stale
-                // sound across a load" behaviour while leaving the volumes intact; the sound
-                // driver re-keys voices from the restored RAM within a frame or two.
-                const uint SpuBase = 0x1F801C00u;
-                var spu = RecompOne.Runtime.Runtime.Spu;
-                if (spu != null)
-                {
-                    spu.WriteReg16(SpuBase + 0x18Cu, 0xFFFF); // KOFF, voices 0-15
-                    spu.WriteReg16(SpuBase + 0x18Eu, 0x00FF); // KOFF, voices 16-23
-                }
-
-                // XA is safe to reset: it only clears the stream buffers and the playing flag,
-                // and the game restarts the stream itself.
-                XaAudio.Reset();
+                // None of the SPU's state is part of the savestate: not the voice registers,
+                // not the 512KB sample RAM, not the master volume. Anything we disturb on load
+                // is therefore never restored by anything.
+                //
+                // Spu.Reset() zeroes the master volume (_mainVolL/R, _mainCurL/R), SPUCNT and
+                // the CD volume; the mixer multiplies the final mix by _mainCurL/R and the game
+                // only writes those during init, so that left the game permanently silent.
+                // Keying every voice off instead kept the volumes but stopped the music: the
+                // sound driver tracks which voices it has already started, so it does not
+                // re-key a sustained note and the BGM never came back.
+                //
+                // Leaving the SPU running lets the restored sequencer state keep driving the
+                // voices it already owns. The cost is that a note that was sounding at the
+                // moment of the load may ring briefly into the restored scene.
 
                 // NOTE: do NOT unwind the C# callstack here.
                 //
