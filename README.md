@@ -36,6 +36,20 @@ never would — that's the point.
 
 ---
 
+## Download
+
+**[Get the APK from the releases page →](https://github.com/sergiomanzur/SymphonyRecomp/releases/latest)**
+
+Current release: **Beta 0.9** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
+
+The APK holds **no game data**. You supply your own disc the first time you open it, and the
+app never asks again. If your device refuses the install, allow "install unknown apps" for
+whichever browser or file manager you downloaded it with.
+
+Rather compile what you run? [Build it yourself](#building-it).
+
+---
+
 ## You need your own copy of the game
 
 No game data is distributed here, and none ever will be. You need a legally owned copy of
@@ -87,8 +101,9 @@ It's a beta. Expect rough edges, and keep real in-game saves alongside your save
 
 ## Building it
 
-There's no published release, so you build it yourself. What comes out holds no game data —
-every player supplies their own disc the first time they open it.
+You don't have to — there's [a prebuilt APK](#download) — but building it yourself is the
+only way to change anything, and it's how you verify what you're running. What comes out
+holds no game data either way; every player supplies their own disc on first launch.
 
 Budget an hour or so, mostly waiting on tool downloads.
 

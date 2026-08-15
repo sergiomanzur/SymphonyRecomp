@@ -6,8 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationId>com.blacklabelhq.sotn</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <!-- ApplicationVersion is the integer versionCode Android compares on update, so it only
+         ever goes up. ApplicationDisplayVersion is what players see. -->
+    <ApplicationVersion>9</ApplicationVersion>
+    <ApplicationDisplayVersion>0.9</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidGenerateAppBundle>false</AndroidGenerateAppBundle>
     <UseFlagsAttributeForFlags>true</UseFlagsAttributeForFlags>
