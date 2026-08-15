@@ -1,122 +1,183 @@
-# Castlevania: Symphony of the Night PSX Recomp
+# SymphonyRecomp — Android
 
-The Castlevania: Symphony of the Night PlayStation Recomp, called SymphonyRecomp, is proudly brought to you by the BlackLabelHQ team! 
+Castlevania: Symphony of the Night, running natively on Android. Not an emulator — the
+PlayStation code is statically recompiled into C# and built into a real app.
 
-# Please Read This
-Before we get started on the README  - This project is a "RE"comp. It is NOT a "DE"comp. Please do NOT go to the SOTN Decomp Discord server to talk about SymphonyRecomp. They are two separate concepts! We, however, encourage you to help out with the SOTN Decomp project if you're interested in helping us fully DECOMPILE the game!
+I started this because Symphony of the Night is a work of art, and art deserves to be
+kept playable. I wanted it in my hands, on a handheld, running properly — not
+approximated. That's the whole reason this fork exists.
 
-Please note this is an Open BETA and this is NOT the final version! This Recomp was made by human hands, no AI is involved in writing this code!
+---
 
-We value human work, PRs made with AI will be closed.
+## Please read this first
 
-# Do You Just Want To Play?
-If you just want to play [download the latest release here](https://github.com/BlackLabelHQ/SymphonyRecomp/releases)!
+**The BlackLabelHQ team does not endorse this Android port, and it is not affiliated with
+them.**
 
-# Do You Need Help?
-You can join our Discord or open an issue on this GitHub! Again, you'll join the BlackLabelHQ Discord Server for help... NOT the SOTN Decomp server.
+This fork was built with heavy AI assistance, verified by hand on real devices. The
+upstream project's position is that they value human work, and they intend to release
+their **own** Android port in their own time. That is their call and I respect it
+completely — their work is the foundation everything here stands on.
 
-[![Discord](https://discord.com/api/guilds/1525942688728481983/widget.png?style=banner2)](https://discord.gg/65g8ZEPnbR)
+So, plainly:
 
-# Special Notes Section
+- **Do not** open issues about this port on the BlackLabelHQ repo.
+- **Do not** ask their Discord for support with this build.
+- If you want the official Android experience, wait for theirs.
+- Everything in this fork is **maintained 100% by me**. Bugs here are mine, not theirs.
 
-This version is currently in BETA stages. You may experience disastrous game breaking bugs! Every effort has been done so that this will not happen but you should be warned regardless. Stable version 1.0 has YET to be released!
+This is also **not** the SOTN Decomp project. A recomp translates the original machine
+code; a decomp rebuilds the source by hand. Two different efforts, both worth your time,
+and the Decomp folks deserve enormous respect for what they're doing. Don't take questions
+about this port to their Discord either.
 
-The goal of this project is to help bring the game to modern computers without some of the limitations of older consoles. This was accomplished through both recompilation means and decompilation efforts. Stay tuned for the full SOTN Decomp release by the SOTN Decomp community, which will be the de facto means of the modern "PC port" efforts once it's fully released.
+**Forks and contributions are welcome here.** Open a PR, fork it, take it somewhere I
+never would — that's the point.
 
-As mentioned above, SymphonyRecomp is NOT the same as the SOTN Decomp project, although several members of Black Label HQ are contributing to that project, as well. They are separate. Please treat them as such.
+---
 
-# Instructions To Build From Source
+## You need your own copy of the game
 
-Clone repo. Add legally owned game files to disc. Run windows_run.bat or windows_initial_build.bat or manually run RecompOne against sotn.json, this will produce the game code, you can then compile it yourself, dev builds do not auto-update
+No game data is distributed here, and none ever will be. You need a legally owned copy of
+the North American PlayStation release, dumped to bin/cue, with these exact filenames:
 
-## Prerequisites
-- A GPU that supports at least OpenGL 3.3 (Desktop) or OpenGL ES 3.0+ (Android)
+```
+Castlevania - Symphony of the Night (Track 1).bin
+Castlevania - Symphony of the Night (Track 2).bin
+Castlevania - Symphony of the Night (USA).cue
+```
+
+Put them in the `disc/` folder before you build.
+
+> **Heads up:** right now the disc is packaged *into* the APK, so the build weighs about
+> 470 MB and contains your dump. Build it for yourself and don't hand it around. Letting
+> the app ask for your bin/cue at runtime is the top item on the [Todo](#todo), and it's
+> what will finally make a clean, shareable APK possible.
+
+---
+
+## What works
+
+- **Native performance.** No emulator, no BIOS file.
+- **Touch controls** — full PSX overlay, switchable D-pad or virtual stick, adjustable
+  opacity, and a HIDE toggle that gets the buttons out of the way.
+- **Physical controllers** — Bluetooth, USB and handhelds (Retroid, Odin, Xbox,
+  DualSense), with PlayStation / Xbox / Nintendo button layouts so the face buttons land
+  where you expect.
+- **Save states** — five slots.
+- **Quality of life** — colour blind fixes, remove screen flashes, bug fixes, easy spell
+  inputs, extra invincibility frames and more, all carried over from the desktop build.
+- **Cheats, stats and inventory** — heal, level, gold, attributes, and a full item, relic
+  and spell editor.
+- **Mods** — compiled on device, so source mods work the same as they do on desktop.
+- **Display** — 4:3, 16:9, stretch or auto-fit, with orientation lock. Settings persist
+  between sessions.
+
+It's a beta. Expect rough edges, and keep real in-game saves alongside your save states.
+
+---
+
+## Building it
+
+There's no download. You build it yourself, because the disc has to be yours.
+
+Budget an hour or so, mostly waiting on tool downloads.
+
+### 1. Tools
+
+- [Git](https://git-scm.com/downloads)
 - [.NET 10 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
-- [OpenAL](https://www.openal.org/documentation/) (Desktop)
-- [Git](https://git-scm.com/install/)
-- A legally owned copy of the North American PSX (PlayStation) version of Castlevania: Symphony of the Night to rip your game from, bin/cue format. The files should be hard named the following and placed inside the `disc` directory in the main directory of `SymphonyRecomp`.
-    - Castlevania - Symphony of the Night (Track 1).bin
-    - Castlevania - Symphony of the Night (Track 2).bin
-    - Castlevania - Symphony of the Night (USA).cue
+- A JDK (17 or newer) and the Android SDK — installing Visual Studio's
+  **.NET Multi-platform App UI development** workload, or Android Studio, gets you both
+
+Then:
+
+```bash
+dotnet workload install android
+```
+
+### 2. Source
+
+Clone **with submodules** — the Android build needs the RecompOne runtime, and a plain
+clone will not build:
+
+```bash
+git clone --recursive https://github.com/sergiomanzur/SymphonyRecomp.git
+cd SymphonyRecomp
+```
+
+Already cloned without it? `git submodule update --init --recursive`
+
+### 3. Your disc files
+
+Copy them into `disc/`, named exactly as listed above. They must be in place *before* you
+publish, since they're packaged as app assets.
+
+### 4. Translate the game code
+
+```bash
+dotnet run --project RecompOne/RecompOne.Recompiler config/sotn.json
+```
+
+This is the recompilation step, and it's required — the Android build compiles the
+`generated/` folder just like the desktop one. On Windows, `windows_initial_build.bat`
+does it for you.
+
+### 5. Build the APK
+
+```bash
+dotnet publish RecompOne.SoTN.Android.csproj -c Release
+```
+
+Your APK lands at `bin/Release/net10.0-android/com.blacklabelhq.sotn-Signed.apk`.
+
+### 6. Install it
+
+Copy it to your device and tap it, or:
+
+```bash
+adb install -r bin/Release/net10.0-android/com.blacklabelhq.sotn-Signed.apk
+```
+
+Needs Android 5.0 (API 21) or newer, arm64 or x64. First launch unpacks the disc out of
+the APK, so give it a moment before the title screen appears.
+
+Once you're in, the **⚙ MENU** button in the top corner opens everything.
 
 ---
 
-## 📱 Android Build & Playing Instructions
+## Known limitations
 
-### Building the Android APK
+- **Save states are best used within one session**, and work most reliably when you save
+  and load at similar moments. The emulated sound chip isn't captured in a state, so one
+  loaded in a different area can play the wrong samples until the game reloads them.
+- **The APK carries your disc**, which is why it's huge and why I won't distribute builds.
+- Desktop-only features — the map tracker, the randomizer panel — aren't in the Android
+  menu yet.
 
-> ⚠️ Your disc files are packaged **into** the APK at build time, so the APK ends up
-> very large (roughly 470 MB) and contains your own dump. Build it for yourself, don't
-> redistribute it. See the [Todo](#todo) - picking a bin/cue from inside the app is
-> planned so a clean APK can be shared.
+## Todo
 
-1. Clone the repo **with submodules** - the Android head builds against the `RecompOne`
-   runtime, so a plain `git clone` will not build:
-   ```bash
-   git clone --recursive https://github.com/BlackLabelHQ/SymphonyRecomp.git
-   cd SymphonyRecomp
-   ```
-   Already cloned without `--recursive`? Run this instead:
-   ```bash
-   git submodule update --init --recursive
-   ```
-2. Install the .NET 10 SDK with the Android workload:
-   ```bash
-   dotnet workload install android
-   ```
-   You will also need a JDK (17 or newer) and the Android SDK. Installing the
-   "Mobile development with .NET" workload in Visual Studio, or Android Studio,
-   provides both.
-3. Add your legally owned game files to the `disc/` folder, named exactly as listed
-   under [Prerequisites](#prerequisites). **They must be in place before you publish**,
-   because they are packaged into the APK as Android assets.
-4. Generate the recompiled game sources. The Android head compiles the `generated/`
-   folder just like the desktop build does, so this step is required:
-   ```bash
-   dotnet run --project RecompOne/RecompOne.Recompiler config/sotn.json
-   ```
-   On Windows you can run `windows_initial_build.bat` instead, which does this for you.
-5. Publish the Release APK:
-   ```bash
-   dotnet publish RecompOne.SoTN.Android.csproj -c Release
-   ```
-6. The generated signed APK will be located at:
-   `bin/Release/net10.0-android/com.blacklabelhq.sotn-Signed.apk`
-7. Install on your Android phone, tablet, or handheld (Retroid Pocket, Odin, etc.):
-   ```bash
-   adb install -r bin/Release/net10.0-android/com.blacklabelhq.sotn-Signed.apk
-   ```
-
-Requires Android 5.0 (API 21) or newer, on arm64 or x64. The first launch unpacks the
-disc and config out of the APK into app storage, so give it a moment before the title
-screen shows up.
-
-### Android Features & Controls
-- **⚙️ In-Game Menu**: Tap the yellow **⚙ MENU** button on-screen to access Cheats, Save/Load State, Mods Manager, Display Settings, Touch Controls, and Disc Reloader.
-- **⚡ Built-in Cheats**: Includes Full Heal, God Mode (Max Stats & Gold), Level 99, and Max Gold toggles.
-- **💾 Save States**: 5 slots, saved and restored on the frame boundary from the in-game menu. Save and load from a comparable point in the game (mid-gameplay to mid-gameplay) - the emulated SPU is not serialised, so a state loaded in a different area can play the wrong samples until the game reloads them.
-- **📱 Dynamic Aspect Ratio & Auto-Fit**: Supports 4:3 Original, 16:9 Widescreen, Stretch, and **Auto-Fit Device** (dynamic fitting for landscape and portrait).
-- **🔄 Auto-Rotate & Orientation Lock**: Choose Auto-Rotate (Sensor), Lock Landscape, or Lock Portrait under Display Settings.
-- **🎮 Controller & Touch Overlay**:
-  - Full PSX Touch Control Overlay with D-Pad or Virtual Analog Joystick (switchable under Touch Controls), 🔺 🟦 🔴 ✖ Action buttons, L1/L2/R1/R2, Select, and Start.
-  - Native Bluetooth, USB, and Handheld Controller support (Retroid Pocket, Xbox, DualSense, Odin).
-- **🔊 Native Audio**: High-fidelity 44.1kHz audio powered by native `Android.Media.AudioTrack`.
+- **Pick your own bin/cue from inside the app.** The disc is currently baked in at build
+  time, which makes the APK enormous and impossible to share. The app should ask for your
+  files on first launch instead, so a clean APK can be distributed and everyone brings
+  their own legally owned dump.
+- Map tracker and randomizer screens for Android.
+- Ongoing: whatever breaks. Tell me about it.
 
 ---
 
-## Nice To Haves (If Wish To Contribute)
+## Credits
 
-- [Visual Studio 2026](https://visualstudio.microsoft.com/downloads/) - More Ideal way to work with the project, you can also use VSCode.
-- [VSCode](https://code.visualstudio.com/)
+None of this exists without the people who did the hard part first.
 
-## How Was This Made?
-this project was made using RecompOne to statically recompile the game, it also used some references from the decomp to help name functions and make patches, please show some love for the Decomp team, they deserve it!
+- **[BlackLabelHQ](https://github.com/BlackLabelHQ/SymphonyRecomp)** — SymphonyRecomp
+  itself. The recompilation, the patches, the widescreen work, the years of effort. This
+  fork is a port of their achievement, nothing more.
+- **flaffy** — [RecompOne](https://github.com/BlackLabelHQ/RecompOne), the static
+  recompiler this whole thing runs on.
+- **The SOTN Decomp community** — for the reverse engineering that made so many function
+  names and patches possible. Go support them.
+- **Konami and KCET, 1997** — for making something people still care about this much,
+  three decades later.
 
-# Todo:
-
-- **Pick your own bin/cue from inside the Android app.** Right now the disc is baked
-  into the APK at build time, which makes the APK huge and impossible to distribute
-  since it carries the game data. The app should ask for the bin/cue on first launch
-  and read them from wherever you put them, so a clean APK can be shared and everyone
-  supplies their own legally owned dump.
-- The rest of the README.MD ... eventually.
+If you enjoy this, the right thing to do is go star the upstream project.
