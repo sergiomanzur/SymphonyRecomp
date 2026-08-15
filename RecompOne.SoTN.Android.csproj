@@ -26,6 +26,16 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="3.1.12" />
   </ItemGroup>
 
+  <!-- Mods are C# source compiled on device, so the compiler and everything a mod might
+       reference has to survive the linker. Without these the trimmer can drop Roslyn's
+       internals, or strip types a mod compiles against that nothing else calls. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="Microsoft.CodeAnalysis" RootMode="all" />
+    <TrimmerRootAssembly Include="Microsoft.CodeAnalysis.CSharp" RootMode="all" />
+    <TrimmerRootAssembly Include="RecompOne.Runtime" RootMode="all" />
+    <TrimmerRootAssembly Include="RecompOne.SoTN.Android" RootMode="all" />
+  </ItemGroup>
+
   <!-- Embed tracker, map, extension, and icon resources directly -->
   <ItemGroup>
     <EmbeddedResource Include="assets/tracker/*.png" />
