@@ -53,8 +53,11 @@
   <ItemGroup>
     <AndroidAsset Include="assets\**\*" />
     <AndroidAsset Include="config\**\*" />
-    <AndroidAsset Include="disc\**\*" />
     <AndroidAsset Include="Android\*.png" />
+    <!-- The disc is deliberately NOT packaged. Bundling it made the APK ~470 MB and baked the
+         builder's own dump into every copy. DiscImporter asks the player for their files on
+         first launch instead. -->
+
     <!-- Ship the bundled mods. The submodule git metadata would otherwise be packaged too. -->
     <AndroidAsset Include="mods\**\*"
                   Exclude="mods\.git\**;mods\**\.git\**;mods\**\.git;mods\.gitignore;mods\.gitmodules;mods\.cache\**" />

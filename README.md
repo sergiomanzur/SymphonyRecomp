@@ -39,26 +39,34 @@ never would — that's the point.
 ## You need your own copy of the game
 
 No game data is distributed here, and none ever will be. You need a legally owned copy of
-the North American PlayStation release, dumped to bin/cue, with these exact filenames:
+the North American PlayStation release, dumped to bin/cue.
+
+**The app never ships with the disc.** On first launch it asks for your files, copies them
+into its own storage, and never asks again. You can name them anything — the importer reads
+your `.cue`, pulls in exactly the tracks it names, and rewrites it to match. It checks the
+disc really is the USA release before accepting it, and tells you if you handed it a
+Japanese or European dump by mistake.
+
+**Building from source is separate.** The recompiler has to read the disc to translate the
+game's code, so a copy must sit in `disc/` at build time, named exactly as `config/sotn.json`
+expects:
 
 ```
-Castlevania - Symphony of the Night (Track 1).bin
-Castlevania - Symphony of the Night (Track 2).bin
+Castlevania - Symphony of the Night (USA) (Track 1).bin
+Castlevania - Symphony of the Night (USA) (Track 2).bin
 Castlevania - Symphony of the Night (USA).cue
 ```
 
-Put them in the `disc/` folder before you build.
-
-> **Heads up:** right now the disc is packaged *into* the APK, so the build weighs about
-> 470 MB and contains your dump. Build it for yourself and don't hand it around. Letting
-> the app ask for your bin/cue at runtime is the top item on the [Todo](#todo), and it's
-> what will finally make a clean, shareable APK possible.
+The `.bin` names only have to match whatever your `.cue` names internally — that block is
+just the layout a standard dump arrives in.
 
 ---
 
 ## What works
 
 - **Native performance.** No emulator, no BIOS file.
+- **Bring your own disc.** The app holds no game data and asks for your dump on first run.
+  Swap it later from **Game disc** in the menu.
 - **Touch controls** — full PSX overlay, switchable D-pad or virtual stick, adjustable
   opacity, and a HIDE toggle that gets the buttons out of the way.
 - **Physical controllers** — Bluetooth, USB and handhelds (Retroid, Odin, Xbox,
@@ -79,7 +87,8 @@ It's a beta. Expect rough edges, and keep real in-game saves alongside your save
 
 ## Building it
 
-There's no download. You build it yourself, because the disc has to be yours.
+There's no published release, so you build it yourself. What comes out holds no game data —
+every player supplies their own disc the first time they open it.
 
 Budget an hour or so, mostly waiting on tool downloads.
 
@@ -110,8 +119,9 @@ Already cloned without it? `git submodule update --init --recursive`
 
 ### 3. Your disc files
 
-Copy them into `disc/`, named exactly as listed above. They must be in place *before* you
-publish, since they're packaged as app assets.
+Copy them into `disc/`, named as listed above. They must be in place *before* the next step,
+because the recompiler reads the disc to translate the game's code. They are **not** packaged
+into the APK — the finished app asks each player for their own copy.
 
 ### 4. Translate the game code
 
@@ -139,8 +149,11 @@ Copy it to your device and tap it, or:
 adb install -r bin/Release/net10.0-android/com.blacklabelhq.sotn-Signed.apk
 ```
 
-Needs Android 5.0 (API 21) or newer, arm64 or x64. First launch unpacks the disc out of
-the APK, so give it a moment before the title screen appears.
+Needs Android 5.0 (API 21) or newer, arm64 or x64.
+
+On first launch it asks for your disc. Select the `.cue` and both `.bin` tracks together —
+long-press to multi-select — and it copies them in, which takes a minute or two. After that
+it boots straight to the game.
 
 Once you're in, the **⚙ MENU** button in the top corner opens everything.
 
@@ -151,16 +164,13 @@ Once you're in, the **⚙ MENU** button in the top corner opens everything.
 - **Save states are best used within one session**, and work most reliably when you save
   and load at similar moments. The emulated sound chip isn't captured in a state, so one
   loaded in a different area can play the wrong samples until the game reloads them.
-- **The APK carries your disc**, which is why it's huge and why I won't distribute builds.
+- **Importing copies the disc**, so you need roughly 600 MB free on top of the app itself.
+  The originals can be deleted afterwards.
 - Desktop-only features — the map tracker, the randomizer panel — aren't in the Android
   menu yet.
 
 ## Todo
 
-- **Pick your own bin/cue from inside the app.** The disc is currently baked in at build
-  time, which makes the APK enormous and impossible to share. The app should ask for your
-  files on first launch instead, so a clean APK can be distributed and everyone brings
-  their own legally owned dump.
 - Map tracker and randomizer screens for Android.
 - Ongoing: whatever breaks. Tell me about it.
 

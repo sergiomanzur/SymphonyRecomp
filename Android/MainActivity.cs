@@ -59,7 +59,6 @@ namespace RecompOne.SoTN.Android
 
             CopyAssets("assets");
             CopyAssets("config");
-            CopyAssets("disc");
             CopyAssets("Android");
             CopyAssets("mods"); // bundled mods, unpacked next to any the player adds
 
@@ -67,7 +66,9 @@ namespace RecompOne.SoTN.Android
             // folder chosen in the menu before the game starts.
             try { ModLoader.RootOverride = ModsDir; } catch { }
 
-            AutoDetectDisc();
+            // The disc is no longer packaged in the APK, so there may be nothing to boot yet.
+            // OnRun gates on it; all that is needed here is the config it gets recorded in.
+            try { ConfigManager.Load(); } catch { }
         }
 
         protected override void OnPostCreate(Bundle? savedInstanceState)
@@ -92,7 +93,15 @@ namespace RecompOne.SoTN.Android
             Console.WriteLine("[Android] MainActivity OnRun executing game Entry.");
             try
             {
-                AutoDetectDisc();
+                // The disc is not in the APK any more, so it may not exist yet. Entry.Run calls
+                // Runtime.WaitForValidDisc(), which spins on the desktop ImGui picker that Android
+                // has no way to drive - so this has to be fully settled before we get there, or
+                // the game thread hangs with nothing on screen explaining why.
+                if (!EnsureDiscReady())
+                {
+                    Console.Error.WriteLine("[Android] No usable disc; not starting the game.");
+                    return;
+                }
 
                 // Program.cs does this on desktop via QualityOfLifeMenu.Register(), which wires
                 // QualityOfLife.Load() to RuntimeReadyEvent. Program.cs is excluded from the
@@ -296,6 +305,7 @@ namespace RecompOne.SoTN.Android
                         .Item("Display", AspectLabelShort(), ShowDisplayMenu)
                         .Item("Controller layout", AndroidSettings.LayoutName(AndroidSettings.Pad), ShowPadLayoutMenu)
                         .Item("Touch controls", _touchVisible ? "Visible" : "Hidden", ShowTouchControlsMenu)
+                        .Item("Game disc", DiscLabel(), ShowDiscMenu)
                         .Danger("Reset all settings", ConfirmResetSettings)
                         .Danger("Reset and reload disc", RestartApp)
                         .Back("Close", () => { })
@@ -306,6 +316,59 @@ namespace RecompOne.SoTN.Android
                     Console.Error.WriteLine($"[Android] Menu dialog failed: {ex.Message}");
                 }
             });
+        }
+
+        private string DiscLabel()
+        {
+            try
+            {
+                string p = ConfigManager.Game.CdPath ?? "";
+                return p.Length > 0 ? System.IO.Path.GetFileNameWithoutExtension(p) : "Not set";
+            }
+            catch { return "Not set"; }
+        }
+
+        private void ShowDiscMenu()
+        {
+            string path = "";
+            try { path = ConfigManager.Game.CdPath ?? ""; } catch { }
+
+            new MenuSheet(this, "Game disc",
+                          path.Length > 0 ? System.IO.Path.GetFileName(path) : "No disc loaded")
+                .Section("Disc")
+                .Item("Replace disc", "Restarts the app", ConfirmReplaceDisc)
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        private void ConfirmReplaceDisc()
+        {
+            MenuSheet.Confirm(this, "Replace disc",
+                "The imported disc will be deleted and the app will restart so you can choose new "
+                + "files. Your saves and save states are kept.",
+                "Replace", () =>
+                {
+                    // Only ever delete the copies this app made. Files the player placed on shared
+                    // storage themselves are theirs, not ours to remove.
+                    foreach (var dir in new[]
+                             {
+                                 DiscImporter.TargetDir(this),
+                                 System.IO.Path.Combine(FilesDir?.Path ?? "", "disc"),
+                             })
+                    {
+                        try { if (Directory.Exists(dir)) Directory.Delete(dir, true); }
+                        catch (Exception ex) { Console.Error.WriteLine($"[Android] Could not remove {dir}: {ex.Message}"); }
+                    }
+
+                    try
+                    {
+                        ConfigManager.Game.CdPath = "";
+                        ConfigManager.SaveGame();
+                    }
+                    catch (Exception ex) { Console.Error.WriteLine($"[Android] Could not clear the disc path: {ex.Message}"); }
+
+                    RestartApp();
+                });
         }
 
         private void RestartApp()
@@ -1031,45 +1094,342 @@ namespace RecompOne.SoTN.Android
             _ => "4:3"
         };
 
-        private void AutoDetectDisc()
+        // --- Disc setup ------------------------------------------------------------------
+        //
+        // The APK ships without game data. On a fresh install the player is asked for their own
+        // dump, which is copied into app storage once and found automatically from then on.
+
+        private const int PickDiscRequest = 0x50C7;
+
+        // Raised when the disc question is settled - imported, or given up on. The game thread
+        // parks on this because there is nothing it can usefully do until then.
+        private readonly System.Threading.ManualResetEventSlim _discGate = new(false);
+        private Dialog? _discSetupDialog;
+        private volatile bool _discImportRunning;
+
+        /// <summary>
+        /// Blocks the calling (game) thread until a usable disc exists. Returns false if the
+        /// player chose to quit instead of providing one.
+        /// </summary>
+        private bool EnsureDiscReady()
+        {
+            if (ResolveDisc()) return true;
+
+            Console.WriteLine("[Android] No disc found; asking the player for one.");
+            RunOnUiThread(() => ShowDiscSetup());
+            _discGate.Wait();
+            return ResolveDisc();
+        }
+
+        /// <summary>
+        /// Points CdPath at a usable disc if one can be found, and reports whether it managed to.
+        /// Kept cheap - it only confirms the cue and its tracks are present, since parsing the
+        /// ISO on every launch would add a visible pause before the splash.
+        /// </summary>
+        private bool ResolveDisc()
         {
             try
             {
                 ConfigManager.Load();
-                var searchDirs = new string[]
-                {
-                    "/sdcard/Android/data/com.blacklabelhq.sotn/files/disc",
-                    global::Android.OS.Environment.ExternalStorageDirectory?.AbsolutePath != null
-                        ? System.IO.Path.Combine(global::Android.OS.Environment.ExternalStorageDirectory.AbsolutePath, "Android", "data", PackageName ?? "com.blacklabelhq.sotn", "files", "disc")
-                        : "",
-                    System.IO.Path.Combine(FilesDir?.Path ?? "", "disc"),
-                    "/sdcard/SymphonyRecomp/disc",
-                    "/sdcard/disc"
-                };
 
-                foreach (var discDir in searchDirs)
+                if (DiscImporter.LooksComplete(ConfigManager.Game.CdPath ?? "")) return true;
+
+                if (DiscImporter.FindExisting(this) is { } found)
                 {
-                    if (!string.IsNullOrWhiteSpace(discDir) && Directory.Exists(discDir))
-                    {
-                        var cueFiles = Directory.GetFiles(discDir, "*.cue");
-                        if (cueFiles.Length > 0)
-                        {
-                            var validCue = cueFiles.FirstOrDefault(f => File.Exists(f) && new FileInfo(f).Length > 0);
-                            if (validCue != null)
-                            {
-                                ConfigManager.Game.CdPath = validCue;
-                                ConfigManager.SaveGame();
-                                Console.WriteLine($"[Android] Auto-configured CdPath to valid cue: {validCue}");
-                                break;
-                            }
-                        }
-                    }
+                    ConfigManager.Game.CdPath = found;
+                    ConfigManager.SaveGame();
+                    Console.WriteLine($"[Android] Using disc: {found}");
+                    return true;
                 }
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[Android] AutoDetectDisc error: {ex.Message}");
+                Console.Error.WriteLine($"[Android] Disc lookup failed: {ex.Message}");
             }
+            return false;
+        }
+
+        /// <summary>
+        /// First-run screen. Deliberately not cancellable: dismissing it would leave the game
+        /// thread parked on _discGate with nothing on screen to explain the black display.
+        /// </summary>
+        private void ShowDiscSetup(string? error = null)
+        {
+            DismissSplashScreen();
+
+            float d = Resources?.DisplayMetrics?.Density ?? 1f;
+            int P(float v) => (int)(v * d + 0.5f);
+
+            var dialog = new Dialog(this);
+            _discSetupDialog = dialog;
+            dialog.RequestWindowFeature((int)WindowFeatures.NoTitle);
+            dialog.SetCancelable(false);
+
+            var panel = new LinearLayout(this) { Orientation = global::Android.Widget.Orientation.Vertical };
+            var bg = new global::Android.Graphics.Drawables.GradientDrawable();
+            bg.SetColor(MenuSheet.Ink);
+            bg.SetCornerRadius(P(18));
+            bg.SetStroke(Math.Max(1, P(1)), Color.Argb(90, MenuSheet.Gold.R, MenuSheet.Gold.G, MenuSheet.Gold.B));
+            panel.Background = bg;
+            panel.SetPadding(P(22), P(20), P(22), P(12));
+
+            var head = new TextView(this) { Text = "GAME FILES NEEDED", TextSize = 17f, LetterSpacing = 0.12f };
+            head.SetTextColor(MenuSheet.Gold);
+            head.SetTypeface(Typeface.Create("serif", TypefaceStyle.Bold), TypefaceStyle.Bold);
+            panel.AddView(head);
+
+            var body = new TextView(this)
+            {
+                Text = error ?? "This app contains no game data. To play, provide your own copy of "
+                     + "Castlevania: Symphony of the Night (USA), dumped from disc.\n\n"
+                     + "Select the .cue file and both .bin tracks together. They are copied into "
+                     + "the app once, so this is only asked for on the first run.",
+                TextSize = 13.5f,
+            };
+            body.SetTextColor(error != null ? MenuSheet.Blood : MenuSheet.Parchment);
+            body.SetPadding(0, P(10), 0, P(4));
+            panel.AddView(body);
+
+            // Progress, hidden until a copy is actually running.
+            var status = new TextView(this) { TextSize = 12.5f, Visibility = ViewStates.Gone };
+            status.SetTextColor(MenuSheet.Mist);
+            status.SetPadding(0, P(8), 0, P(4));
+            panel.AddView(status);
+
+            var bar = new ProgressBar(this, null, global::Android.Resource.Attribute.ProgressBarStyleHorizontal)
+            {
+                Max = 100,
+                Visibility = ViewStates.Gone,
+            };
+            panel.AddView(bar);
+
+            LinearLayout Action(string label, Color colour, Action onTap)
+            {
+                var row = new LinearLayout(this) { Orientation = global::Android.Widget.Orientation.Horizontal };
+                row.SetGravity(GravityFlags.Center);
+                row.SetPadding(P(16), P(14), P(16), P(14));
+                row.SetMinimumHeight(P(52));
+                row.Clickable = true;
+                var tv = new TextView(this) { Text = label, TextSize = 14f, LetterSpacing = 0.1f };
+                tv.SetTextColor(colour);
+                tv.SetTypeface(Typeface.Create("sans-serif-medium", TypefaceStyle.Normal), TypefaceStyle.Normal);
+                row.AddView(tv);
+                row.Click += (s, e) => onTap();
+                return row;
+            }
+
+            var choose = Action("Choose disc files", MenuSheet.Gold, () =>
+            {
+                if (_discImportRunning) return;
+                StartDiscPicker();
+            });
+            panel.AddView(choose);
+
+            var quit = Action("Exit", MenuSheet.Mist, () =>
+            {
+                if (_discImportRunning) return;
+                dialog.Dismiss();
+                _discSetupDialog = null;
+                _discGate.Set(); // let the game thread unwind instead of parking forever
+                Finish();
+            });
+            panel.AddView(quit);
+
+            // Handed to the import so it can drive this dialog without rebuilding it.
+            _discProgress = (text, percent) => RunOnUiThread(() =>
+            {
+                status.Visibility = ViewStates.Visible;
+                bar.Visibility = ViewStates.Visible;
+                choose.Visibility = ViewStates.Gone;
+                quit.Visibility = ViewStates.Gone;
+                body.Text = "Copying your disc into the app. This takes a minute or two and only happens once.";
+                body.SetTextColor(MenuSheet.Parchment);
+                status.Text = text;
+                bar.Progress = percent;
+            });
+
+            var host = new FrameLayout(this);
+            host.SetBackgroundColor(Color.Argb(210, 0, 0, 0));
+            host.Clickable = true;
+            panel.Clickable = true;
+            panel.LayoutParameters = new FrameLayout.LayoutParams(
+                Math.Min(P(380), (int)((Resources?.DisplayMetrics?.WidthPixels ?? 1000) * 0.86f)),
+                ViewGroup.LayoutParams.WrapContent)
+            { Gravity = GravityFlags.Center };
+            host.AddView(panel);
+
+            dialog.SetContentView(host);
+            var w = dialog.Window;
+            if (w != null)
+            {
+                w.SetBackgroundDrawable(new global::Android.Graphics.Drawables.ColorDrawable(Color.Transparent));
+                w.SetLayout(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);
+                w.SetDimAmount(0f);
+            }
+
+            try
+            {
+                dialog.Show();
+            }
+            catch (Exception ex)
+            {
+                // Without this the game thread would sit on _discGate forever behind a black
+                // screen. Better to fail loudly and let the player reopen the app.
+                Console.Error.WriteLine($"[Android] Could not show the disc setup screen: {ex.Message}");
+                _discSetupDialog = null;
+                _discGate.Set();
+                Finish();
+            }
+        }
+
+        private Action<string, int>? _discProgress;
+
+        private void StartDiscPicker()
+        {
+            try
+            {
+                var intent = new Intent(Intent.ActionOpenDocument);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("*/*");
+                intent.PutExtra(Intent.ExtraAllowMultiple, true);
+                StartActivityForResult(intent, PickDiscRequest);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Android] Could not open the file picker: {ex.Message}");
+                RestartDiscSetup($"This device could not open a file picker ({ex.Message}). "
+                               + "Copy your .cue and .bin files into:\n\n" + DiscImporter.TargetDir(this)
+                               + "\n\nthen reopen the app.");
+            }
+        }
+
+        protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
+        {
+            base.OnActivityResult(requestCode, resultCode, data);
+            if (requestCode != PickDiscRequest) return;
+
+            if (resultCode != Result.Ok || data == null)
+            {
+                Console.WriteLine("[Android] Disc selection cancelled.");
+                return; // the setup dialog is still up, so there is nothing to recover
+            }
+
+            var picked = CollectPicked(data);
+            if (picked.Count == 0)
+            {
+                RestartDiscSetup("No files came back from the picker. Try selecting them again.");
+                return;
+            }
+
+            RunImport(picked);
+        }
+
+        /// <summary>Reads the names and sizes of everything the picker returned.</summary>
+        private List<DiscImporter.Picked> CollectPicked(Intent data)
+        {
+            var uris = new List<global::Android.Net.Uri>();
+
+            if (data.ClipData is { } clip)
+            {
+                for (int i = 0; i < clip.ItemCount; i++)
+                    if (clip.GetItemAt(i)?.Uri is { } u) uris.Add(u);
+            }
+            else if (data.Data is { } single)
+            {
+                uris.Add(single);
+            }
+
+            var result = new List<DiscImporter.Picked>();
+            foreach (var uri in uris)
+            {
+                string name = "";
+                long size = 0;
+                try
+                {
+                    using var c = ContentResolver?.Query(uri, null, null, null, null);
+                    if (c != null && c.MoveToFirst())
+                    {
+                        // DocumentsContract column names; used literally so this does not depend
+                        // on binding constants.
+                        int ni = c.GetColumnIndex("_display_name");
+                        int si = c.GetColumnIndex("_size");
+                        if (ni >= 0 && !c.IsNull(ni)) name = c.GetString(ni) ?? "";
+                        if (si >= 0 && !c.IsNull(si)) size = c.GetLong(si);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[Android] Could not read file details: {ex.Message}");
+                }
+
+                if (string.IsNullOrWhiteSpace(name)) name = uri.LastPathSegment ?? "file";
+
+                var captured = uri;
+                result.Add(new DiscImporter.Picked
+                {
+                    Name = name,
+                    Size = size,
+                    Open = () => ContentResolver?.OpenInputStream(captured),
+                });
+            }
+            return result;
+        }
+
+        private void RunImport(List<DiscImporter.Picked> picked)
+        {
+            _discImportRunning = true;
+            var report = _discProgress ?? ((_, _) => { });
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                DiscImporter.ImportResult result;
+                try
+                {
+                    result = DiscImporter.Import(this, picked, report);
+                }
+                catch (Exception ex)
+                {
+                    result = new DiscImporter.ImportResult { Success = false, Error = ex.Message };
+                }
+
+                _discImportRunning = false;
+
+                RunOnUiThread(() =>
+                {
+                    if (result.Success && result.CuePath != null)
+                    {
+                        try
+                        {
+                            ConfigManager.Game.CdPath = result.CuePath;
+                            ConfigManager.SaveGame();
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"[Android] Could not save the disc path: {ex.Message}");
+                        }
+
+                        Console.WriteLine($"[Android] Disc imported: {result.CuePath}");
+                        _discSetupDialog?.Dismiss();
+                        _discSetupDialog = null;
+                        _discGate.Set(); // release the game thread
+                    }
+                    else
+                    {
+                        RestartDiscSetup(result.Error ?? "The disc could not be imported.");
+                    }
+                });
+            });
+        }
+
+        /// <summary>Rebuilds the setup screen carrying an error, so the player can try again.</summary>
+        private void RestartDiscSetup(string error)
+        {
+            RunOnUiThread(() =>
+            {
+                try { _discSetupDialog?.Dismiss(); } catch { }
+                _discSetupDialog = null;
+                ShowDiscSetup(error);
+            });
         }
 
         private void CopyAssets(string path)
