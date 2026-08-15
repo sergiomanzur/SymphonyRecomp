@@ -34,8 +34,18 @@ namespace RecompOne.SoTN.Android
 
         public static ScreenOrientationMode CurrentOrientationMode = ScreenOrientationMode.AutoRotate;
 
-        private float _touchOpacity = 0.7f;
-        private bool _touchVisible = true;
+        // Backed by AndroidSettings so they survive a restart; the setters persist.
+        private float _touchOpacity
+        {
+            get => AndroidSettings.TouchOpacity;
+            set => AndroidSettings.TouchOpacity = value;
+        }
+
+        private bool _touchVisible
+        {
+            get => AndroidSettings.TouchVisible;
+            set => AndroidSettings.TouchVisible = value;
+        }
 
         protected override void OnCreate(Bundle? savedInstanceState)
         {
@@ -63,6 +73,16 @@ namespace RecompOne.SoTN.Android
         protected override void OnPostCreate(Bundle? savedInstanceState)
         {
             base.OnPostCreate(savedInstanceState);
+
+            // Restore the saved orientation lock now that the activity exists.
+            CurrentOrientationMode = AndroidSettings.Orientation;
+            RequestedOrientation = CurrentOrientationMode switch
+            {
+                ScreenOrientationMode.LockLandscape => ScreenOrientation.SensorLandscape,
+                ScreenOrientationMode.LockPortrait => ScreenOrientation.SensorPortrait,
+                _ => ScreenOrientation.Sensor
+            };
+
             SetupTouchControls();
             ShowSplashScreen();
         }
@@ -73,6 +93,20 @@ namespace RecompOne.SoTN.Android
             try
             {
                 AutoDetectDisc();
+
+                // Program.cs does this on desktop via QualityOfLifeMenu.Register(), which wires
+                // QualityOfLife.Load() to RuntimeReadyEvent. Program.cs is excluded from the
+                // Android build, so without this the saved toggles were never read back and
+                // every launch started with all of them off.
+                try { QualityOfLife.Load(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] QoL settings failed to load: {ex.Message}"); }
+
+                // Aspect ratio and pad layout are plain statics in the runtime, so restore the
+                // saved choices before the game starts. Orientation is applied in OnPostCreate,
+                // once the activity can accept a request.
+                try { AndroidSettings.ApplyAtStartup(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] settings failed to apply: {ex.Message}"); }
+
                 var cdPath = ConfigManager.Game.CdPath;
                 Console.WriteLine($"[Android] Launching Entry.Run with CdPath = '{cdPath}'");
 
@@ -260,7 +294,9 @@ namespace RecompOne.SoTN.Android
                         .Item("Mods", $"{ModLoader.Mods.Count} installed", ShowModsMenu)
                         .Section("System")
                         .Item("Display", AspectLabelShort(), ShowDisplayMenu)
+                        .Item("Controller layout", AndroidSettings.LayoutName(AndroidSettings.Pad), ShowPadLayoutMenu)
                         .Item("Touch controls", _touchVisible ? "Visible" : "Hidden", ShowTouchControlsMenu)
+                        .Danger("Reset all settings", ConfirmResetSettings)
                         .Danger("Reset and reload disc", RestartApp)
                         .Back("Close", () => { })
                         .Show();
@@ -469,6 +505,7 @@ namespace RecompOne.SoTN.Android
             void Pick(ScreenOrientationMode mode, ScreenOrientation req, string label)
             {
                 CurrentOrientationMode = mode;
+                AndroidSettings.Orientation = mode;
                 RequestedOrientation = req;
                 SetupTouchControls();
                 Toast.MakeText(this, label, ToastLength.Short)?.Show();
@@ -492,6 +529,7 @@ namespace RecompOne.SoTN.Android
             void Pick(HostWindow.AspectRatioMode mode, string label)
             {
                 HostWindow.CurrentAspectRatio = mode;
+                AndroidSettings.Aspect = mode;
                 Toast.MakeText(this, label, ToastLength.Short)?.Show();
                 ShowDisplayMenu();
             }
@@ -554,6 +592,66 @@ namespace RecompOne.SoTN.Android
                         .Show())
                 .Back("Back", ShowMenuDialog)
                 .Show();
+        }
+
+        // --- Controller layout -----------------------------------------------------------
+
+        private void ShowPadLayoutMenu()
+        {
+            var cur = AndroidSettings.Pad;
+
+            void Pick(PadLayout layout)
+            {
+                AndroidSettings.Pad = layout;
+                Toast.MakeText(this, $"{AndroidSettings.LayoutName(layout)} layout", ToastLength.Short)?.Show();
+                ShowPadLayoutMenu();
+            }
+
+            new MenuSheet(this, "Controller layout", "Which physical button acts as which PlayStation button")
+                .Item("PlayStation", cur == PadLayout.PlayStation ? "In use" : "Bottom is Cross",
+                    () => Pick(PadLayout.PlayStation))
+                .Item("Xbox", cur == PadLayout.Xbox ? "In use" : "A is Cross",
+                    () => Pick(PadLayout.Xbox))
+                .Item("Nintendo", cur == PadLayout.Nintendo ? "In use" : "B is Cross",
+                    () => Pick(PadLayout.Nintendo))
+                .Section("If the buttons feel wrong")
+                .Item("Try another layout", "Pads report their buttons differently", () =>
+                    Toast.MakeText(this,
+                        "Pick the layout whose bottom-row button jumps. Nintendo-arranged pads swap A/B and X/Y.",
+                        ToastLength.Long)?.Show())
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        // --- Reset -----------------------------------------------------------------------
+
+        private void ConfirmResetSettings()
+        {
+            MenuSheet.Confirm(this, "Reset all settings",
+                "Display, controls, controller layout, quality of life and the mods folder go back to their defaults. Save states, memory cards and your disc are untouched.",
+                "Reset everything", () =>
+                {
+                    try
+                    {
+                        AndroidSettings.ResetAll();
+
+                        CurrentOrientationMode = ScreenOrientationMode.AutoRotate;
+                        RequestedOrientation = ScreenOrientation.Sensor;
+                        if (_touchView != null)
+                        {
+                            _touchView.TouchVisible = AndroidSettings.DefaultTouchVisible;
+                            _touchView.TouchOpacity = AndroidSettings.DefaultTouchOpacity;
+                            _touchView.ControlMode = TouchControlMode.DPad;
+                            _touchView.Invalidate();
+                        }
+                        SetupTouchControls();
+                        Toast.MakeText(this, "Settings reset", ToastLength.Short)?.Show();
+                    }
+                    catch (Exception ex)
+                    {
+                        Toast.MakeText(this, $"Could not reset: {ex.Message}", ToastLength.Long)?.Show();
+                    }
+                });
         }
 
         // --- Mods folder -----------------------------------------------------------------

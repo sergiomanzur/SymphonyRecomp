@@ -328,6 +328,78 @@ namespace RecompOne.SoTN.Android
         }
 
         /// <summary>
+        /// Asks before doing something that cannot be undone. The confirming action is drawn
+        /// in blood red so it reads differently from the way out.
+        /// </summary>
+        public static void Confirm(Activity activity, string title, string message,
+                                   string confirmLabel, Action onConfirm)
+        {
+            float d = activity.Resources?.DisplayMetrics?.Density ?? 1f;
+            int P(float v) => (int)(v * d + 0.5f);
+
+            var dialog = new Dialog(activity);
+            dialog.RequestWindowFeature((int)WindowFeatures.NoTitle);
+
+            var panel = new LinearLayout(activity) { Orientation = Orientation.Vertical };
+            var bg = new GradientDrawable();
+            bg.SetColor(Ink);
+            bg.SetCornerRadius(P(18));
+            bg.SetStroke(Math.Max(1, P(1)), Color.Argb(90, Gold.R, Gold.G, Gold.B));
+            panel.Background = bg;
+            panel.SetPadding(P(22), P(20), P(22), P(10));
+
+            var head = new TextView(activity) { Text = title, TextSize = 17f, LetterSpacing = 0.12f };
+            head.SetTextColor(Gold);
+            head.SetTypeface(Typeface.Create("serif", TypefaceStyle.Bold), TypefaceStyle.Bold);
+            panel.AddView(head);
+
+            var body = new TextView(activity) { Text = message, TextSize = 13.5f };
+            body.SetTextColor(Parchment);
+            body.SetPadding(0, P(10), 0, P(6));
+            panel.AddView(body);
+
+            LinearLayout Action(string label, Color colour, Action onTap)
+            {
+                var row = new LinearLayout(activity) { Orientation = Orientation.Horizontal };
+                row.SetGravity(GravityFlags.Center);
+                row.SetPadding(P(16), P(14), P(16), P(14));
+                row.SetMinimumHeight(P(52));
+                row.Clickable = true;
+                var tv = new TextView(activity) { Text = label, TextSize = 14f, LetterSpacing = 0.1f };
+                tv.SetTextColor(colour);
+                tv.SetTypeface(Typeface.Create("sans-serif-medium", TypefaceStyle.Normal), TypefaceStyle.Normal);
+                row.AddView(tv);
+                row.Click += (s, e) => { dialog.Dismiss(); onTap(); };
+                return row;
+            }
+
+            panel.AddView(Action(confirmLabel, Blood, onConfirm));
+            panel.AddView(Action("Cancel", Mist, () => { }));
+
+            var host = new FrameLayout(activity);
+            host.SetBackgroundColor(Color.Argb(150, 0, 0, 0));
+            host.Clickable = true;
+            host.Click += (s, e) => dialog.Dismiss();
+            panel.Clickable = true;
+            panel.LayoutParameters = new FrameLayout.LayoutParams(
+                Math.Min(P(340), (int)((activity.Resources?.DisplayMetrics?.WidthPixels ?? 1000) * 0.82f)),
+                ViewGroup.LayoutParams.WrapContent)
+            { Gravity = GravityFlags.Center };
+            host.AddView(panel);
+
+            dialog.SetContentView(host);
+            dialog.SetCanceledOnTouchOutside(true);
+            var w = dialog.Window;
+            if (w != null)
+            {
+                w.SetBackgroundDrawable(new ColorDrawable(Color.Transparent));
+                w.SetLayout(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);
+                w.SetDimAmount(0f);
+            }
+            dialog.Show();
+        }
+
+        /// <summary>
         /// Numeric entry for the stat editors, themed to match the sheet instead of using the
         /// stock input dialog.
         /// </summary>
