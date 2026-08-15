@@ -14,6 +14,7 @@ using RecompOne.Runtime.Hardware;
 using RecompOne.Runtime.Host;
 using RecompOne.Runtime.Memory;
 using RecompOne.Runtime.Modding;
+using Recompiled; // QualityOfLife, MovementCheat - the desktop patch flags
 using Sotn;
 
 namespace RecompOne.SoTN.Android
@@ -50,6 +51,11 @@ namespace RecompOne.SoTN.Android
             CopyAssets("config");
             CopyAssets("disc");
             CopyAssets("Android");
+            CopyAssets("mods"); // bundled mods, unpacked next to any the player adds
+
+            // Entry.Run calls ModLoader.LoadAll() with no argument, so point the loader at the
+            // folder chosen in the menu before the game starts.
+            try { ModLoader.RootOverride = ModsDir; } catch { }
 
             AutoDetectDisc();
         }
@@ -236,33 +242,27 @@ namespace RecompOne.SoTN.Android
             {
                 try
                 {
-                    var options = new string[]
-                    {
-                        "⚡ Cheats (Full Heal, God Mode, Gold)",
-                        "💾 Save State (Slots 1-5)",
-                        "📂 Load State (Slots 1-5)",
-                        "🧩 Mods Manager",
-                        "🎨 Display Settings (Aspect, Resolution)",
-                        "🎮 Touch Controls (Opacity, Visibility)",
-                        "🔄 Reset / Reload Disc"
-                    };
+                    string baseDir = FilesDir?.Path ?? "";
+                    int used = 0;
+                    for (int i = 1; i <= 5; i++)
+                        if (!SaveStateManager.GetSlotInfo(baseDir, i).Contains("(Empty)")) used++;
 
-                    new AlertDialog.Builder(this)
-                        .SetTitle("SymphonyRecomp Menu")
-                        .SetItems(options, (s, e) =>
-                        {
-                            switch (e.Which)
-                            {
-                                case 0: ShowCheatsMenu(); break;
-                                case 1: ShowSaveStateMenu(); break;
-                                case 2: ShowLoadStateMenu(); break;
-                                case 3: ShowModsMenu(); break;
-                                case 4: ShowDisplayMenu(); break;
-                                case 5: ShowTouchControlsMenu(); break;
-                                case 6: RestartApp(); break;
-                            }
-                        })
-                        .SetNegativeButton("Close", (IDialogInterfaceOnClickListener?)null)
+                    new MenuSheet(this, "Symphony Recomp")
+                        .Section("Game")
+                        .Item("Quality of life", QolSummary(), ShowQualityOfLifeMenu)
+                        .Item("Cheats", "Heal, stats, gold", ShowCheatsMenu)
+                        .Item("Stats and level", SafeStat(() => $"Lv {Player.Level}"), ShowStatsMenu)
+                        .Item("Inventory", "Items, relics, spells", ShowInventoryMenu)
+                        .Item("Movement", MovementSummary(), ShowMovementMenu)
+                        .Section("Save")
+                        .Item("Save state", used == 0 ? "5 slots" : $"{used} of 5 used", ShowSaveStateMenu)
+                        .Item("Load state", used == 0 ? "No saves" : $"{used} available", ShowLoadStateMenu)
+                        .Item("Mods", $"{ModLoader.Mods.Count} installed", ShowModsMenu)
+                        .Section("System")
+                        .Item("Display", AspectLabelShort(), ShowDisplayMenu)
+                        .Item("Touch controls", _touchVisible ? "Visible" : "Hidden", ShowTouchControlsMenu)
+                        .Danger("Reset and reload disc", RestartApp)
+                        .Back("Close", () => { })
                         .Show();
                 }
                 catch (Exception ex)
@@ -300,28 +300,17 @@ namespace RecompOne.SoTN.Android
             try
             {
                 string baseDir = FilesDir?.Path ?? "/sdcard/Android/data/com.blacklabelhq.sotn/files";
-                var slots = new string[5];
-                for (int i = 0; i < 5; i++)
-                    slots[i] = SaveStateManager.GetSlotInfo(baseDir, i + 1);
-
-                new AlertDialog.Builder(this)
-                    .SetTitle("Save State to Slot")
-                    .SetItems(slots, (s, e) =>
-                    {
-                        int slot = e.Which + 1;
+                var sheet = new MenuSheet(this, "Save state", "Overwrites the chosen slot");
+                for (int i = 1; i <= 5; i++)
+                {
+                    int slot = i;
+                    sheet.Item($"Slot {slot}", SlotStamp(baseDir, slot), () =>
                         SaveStateManager.RequestSaveState(baseDir, slot, (success, err, sl) =>
-                        {
-                            RunOnUiThread(() =>
-                            {
-                                if (success)
-                                    Toast.MakeText(this, $"💾 Saved State to Slot {sl}!", ToastLength.Short)?.Show();
-                                else
-                                    Toast.MakeText(this, $"Save State Failed: {err}", ToastLength.Long)?.Show();
-                            });
-                        });
-                    })
-                    .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
-                    .Show();
+                            RunOnUiThread(() => Toast.MakeText(this,
+                                success ? $"Saved to slot {sl}" : $"Save failed: {err}",
+                                success ? ToastLength.Short : ToastLength.Long)?.Show())));
+                }
+                sheet.Back("Back", ShowMenuDialog).Show();
             }
             catch (Exception ex)
             {
@@ -334,28 +323,17 @@ namespace RecompOne.SoTN.Android
             try
             {
                 string baseDir = FilesDir?.Path ?? "/sdcard/Android/data/com.blacklabelhq.sotn/files";
-                var slots = new string[5];
-                for (int i = 0; i < 5; i++)
-                    slots[i] = SaveStateManager.GetSlotInfo(baseDir, i + 1);
-
-                new AlertDialog.Builder(this)
-                    .SetTitle("Load State from Slot")
-                    .SetItems(slots, (s, e) =>
-                    {
-                        int slot = e.Which + 1;
+                var sheet = new MenuSheet(this, "Load state");
+                for (int i = 1; i <= 5; i++)
+                {
+                    int slot = i;
+                    sheet.Item($"Slot {slot}", SlotStamp(baseDir, slot), () =>
                         SaveStateManager.RequestLoadState(baseDir, slot, (success, err, sl) =>
-                        {
-                            RunOnUiThread(() =>
-                            {
-                                if (success)
-                                    Toast.MakeText(this, $"📂 Loaded State from Slot {sl}!", ToastLength.Short)?.Show();
-                                else
-                                    Toast.MakeText(this, $"Load State Failed: {err}", ToastLength.Long)?.Show();
-                            });
-                        });
-                    })
-                    .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
-                    .Show();
+                            RunOnUiThread(() => Toast.MakeText(this,
+                                success ? $"Loaded slot {sl}" : $"Load failed: {err}",
+                                success ? ToastLength.Short : ToastLength.Long)?.Show())));
+                }
+                sheet.Back("Back", ShowMenuDialog).Show();
             }
             catch (Exception ex)
             {
@@ -367,7 +345,7 @@ namespace RecompOne.SoTN.Android
         {
             try
             {
-                string modsDir = System.IO.Path.Combine(FilesDir?.Path ?? "/sdcard/Android/data/com.blacklabelhq.sotn/files", "mods");
+                string modsDir = ModsDir;
                 if (!Directory.Exists(modsDir)) Directory.CreateDirectory(modsDir);
 
                 var mods = ModLoader.Mods;
@@ -378,46 +356,40 @@ namespace RecompOne.SoTN.Android
 
                 if (mods.Count == 0)
                 {
-                    new AlertDialog.Builder(this)
-                        .SetTitle("Mods Manager")
-                        .SetMessage($"No mods found.\n\nMods Folder:\n{modsDir}\n\nPlace mod folders or precompiled mod DLLs in this directory.")
-                        .SetPositiveButton("Refresh", (s, e) => { try { ModLoader.LoadAll(modsDir); } catch { } ShowModsMenu(); })
-                        .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
+                    new MenuSheet(this, "Mods", $"Looking in {FriendlyModsDir(modsDir)}")
+                        .Section("Nothing installed")
+                        .Item("Mods folder", FriendlyModsDir(modsDir), ShowModsFolderMenu)
+                        .Item("Scan mods folder", "Refresh", () =>
+                        {
+                            try { ModLoader.LoadAll(modsDir); } catch { }
+                            ShowModsMenu();
+                        })
+                        .Back("Back", ShowMenuDialog)
                         .Show();
                     return;
                 }
 
-                var modItems = new string[mods.Count + 1];
-                for (int i = 0; i < mods.Count; i++)
+                var sheet = new MenuSheet(this, "Mods", $"{mods.Count} installed");
+                foreach (var mod in mods)
                 {
-                    var m = mods[i];
-                    string stateStr = m.Enabled ? "🟢 [ON]" : "⚪ [OFF]";
+                    var m = mod;
                     string name = string.IsNullOrWhiteSpace(m.Info.Name) ? m.Info.Id : m.Info.Name;
-                    modItems[i] = $"{stateStr} {name} (v{m.Info.Version})";
-                }
-                modItems[mods.Count] = "🔄 Reload All Mods";
-
-                new AlertDialog.Builder(this)
-                    .SetTitle($"Mods ({mods.Count} Available)")
-                    .SetItems(modItems, (s, e) =>
+                    sheet.Toggle($"{name}  v{m.Info.Version}", m.Enabled, on =>
                     {
-                        if (e.Which == mods.Count)
-                        {
-                            try { ModLoader.LoadAll(modsDir); } catch { }
-                            Toast.MakeText(this, "Reloaded mods folder", ToastLength.Short)?.Show();
-                            ShowModsMenu();
-                        }
-                        else if (e.Which >= 0 && e.Which < mods.Count)
-                        {
-                            var selectedMod = mods[e.Which];
-                            bool newState = !selectedMod.Enabled;
-                            ModLoader.SetEnabled(selectedMod.Info.Id, newState);
-                            Toast.MakeText(this, $"{(newState ? "Enabled" : "Disabled")}: {selectedMod.Info.Name}", ToastLength.Short)?.Show();
-                            ShowModsMenu();
-                        }
-                    })
-                    .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
-                    .Show();
+                        ModLoader.SetEnabled(m.Info.Id, on);
+                        Toast.MakeText(this, $"{name} {(on ? "enabled" : "disabled")}", ToastLength.Short)?.Show();
+                    });
+                }
+                sheet.Section("Library")
+                     .Item("Mods folder", FriendlyModsDir(modsDir), ShowModsFolderMenu)
+                     .Item("Scan mods folder", "Refresh", () =>
+                     {
+                         try { ModLoader.LoadAll(modsDir); } catch { }
+                         Toast.MakeText(this, "Mods folder rescanned", ToastLength.Short)?.Show();
+                         ShowModsMenu();
+                     })
+                     .Back("Back", ShowMenuDialog)
+                     .Show();
             }
             catch (Exception ex)
             {
@@ -427,53 +399,30 @@ namespace RecompOne.SoTN.Android
 
         private void ShowCheatsMenu()
         {
-            var cheats = new string[]
+            void Apply(string done, Action act)
             {
-                "💖 Full Heal (Max HP, MP, Hearts)",
-                "🔥 God Mode (Max Stats, 9999 HP, $999k Gold)",
-                "⭐ Max Level 99",
-                "💰 Add $999,999 Gold"
-            };
+                try { act(); Toast.MakeText(this, done, ToastLength.Short)?.Show(); }
+                catch (Exception ex) { Toast.MakeText(this, $"Not available right now: {ex.Message}", ToastLength.Long)?.Show(); }
+                ShowCheatsMenu(); // reopen so several can be applied in a row
+            }
 
-            new AlertDialog.Builder(this)
-                .SetTitle("Cheats")
-                .SetItems(cheats, (s, e) =>
+            new MenuSheet(this, "Cheats", "Applies to the current game")
+                .Section("Restore")
+                .Item("Full heal", "HP, MP, hearts", () => Apply("Healed", Player.FullHeal))
+                .Section("Grant")
+                .Item("Max out stats", "9999 HP / MP", () => Apply("Stats maxed", () =>
                 {
-                    try
-                    {
-                        switch (e.Which)
-                        {
-                            case 0:
-                                Player.FullHeal();
-                                Toast.MakeText(this, "Full Heal Applied!", ToastLength.Short)?.Show();
-                                break;
-                            case 1:
-                                Player.HpMax = Player.Hp = 9999;
-                                Player.MpMax = Player.Mp = 9999;
-                                Player.HeartsMax = Player.Hearts = 999;
-                                Player.Strength = 999;
-                                Player.Constitution = 999;
-                                Player.Intelligence = 999;
-                                Player.Luck = 999;
-                                Player.Gold = 999999;
-                                Toast.MakeText(this, "God Mode Enabled!", ToastLength.Short)?.Show();
-                                break;
-                            case 2:
-                                Player.Level = 99;
-                                Toast.MakeText(this, "Set to Level 99!", ToastLength.Short)?.Show();
-                                break;
-                            case 3:
-                                Player.Gold = 999999;
-                                Toast.MakeText(this, "Max Gold Added!", ToastLength.Short)?.Show();
-                                break;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Toast.MakeText(this, $"Cheat unavailable: {ex.Message}", ToastLength.Long)?.Show();
-                    }
-                })
-                .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
+                    Player.HpMax = Player.Hp = 9999;
+                    Player.MpMax = Player.Mp = 9999;
+                    Player.HeartsMax = Player.Hearts = 999;
+                    Player.Strength = 999;
+                    Player.Constitution = 999;
+                    Player.Intelligence = 999;
+                    Player.Luck = 999;
+                }))
+                .Item("Level 99", $"Now {SafeLevel()}", () => Apply("Level 99", () => Player.Level = 99))
+                .Item("999,999 gold", $"Now {SafeGold()}", () => Apply("Gold added", () => Player.Gold = 999999))
+                .Back("Back", ShowMenuDialog)
                 .Show();
         }
 
@@ -494,149 +443,495 @@ namespace RecompOne.SoTN.Android
                 _ => "🔄 Auto-Rotate (Sensor)"
             };
 
-            var options = new string[]
-            {
-                $"Orientation: {orientStr}",
-                $"Aspect Ratio: {aspectStr}",
-                $"Resolution: {(ConfigManager.View.NativeResolution ? "Native PSX (1x)" : "High Resolution (4x)")}",
-                $"VSync: {(ConfigManager.View.VSync ? "Enabled" : "Disabled")}"
-            };
-
-            new AlertDialog.Builder(this)
-                .SetTitle("Display Settings")
-                .SetItems(options, (s, e) =>
+            new MenuSheet(this, "Display")
+                .Section("Screen")
+                .Item("Orientation", orientStr, ShowOrientationSubmenu)
+                .Item("Aspect ratio", aspectStr, ShowAspectRatioSubmenu)
+                .Section("Rendering")
+                .Toggle("High resolution (4x)", !ConfigManager.View.NativeResolution, on =>
                 {
-                    if (e.Which == 0)
-                    {
-                        ShowOrientationSubmenu();
-                    }
-                    else if (e.Which == 1)
-                    {
-                        ShowAspectRatioSubmenu();
-                    }
-                    else if (e.Which == 2)
-                    {
-                        ConfigManager.View.NativeResolution = !ConfigManager.View.NativeResolution;
-                        ConfigManager.SaveView(null);
-                        HostWindow.RequestGpuReset();
-                        Toast.MakeText(this, $"Resolution toggled: {(ConfigManager.View.NativeResolution ? "Native (1x)" : "High Res (4x)")}", ToastLength.Short)?.Show();
-                    }
-                    else if (e.Which == 3)
-                    {
-                        ConfigManager.View.VSync = !ConfigManager.View.VSync;
-                        HostWindow.SetVSync(ConfigManager.View.VSync);
-                        ConfigManager.SaveView(null);
-                        Toast.MakeText(this, $"VSync: {(ConfigManager.View.VSync ? "ON" : "OFF")}", ToastLength.Short)?.Show();
-                    }
+                    ConfigManager.View.NativeResolution = !on;
+                    ConfigManager.SaveView(null);
+                    HostWindow.RequestGpuReset();
                 })
-                .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
+                .Toggle("VSync", ConfigManager.View.VSync, on =>
+                {
+                    ConfigManager.View.VSync = on;
+                    HostWindow.SetVSync(on);
+                    ConfigManager.SaveView(null);
+                })
+                .Back("Back", ShowMenuDialog)
                 .Show();
         }
 
         private void ShowOrientationSubmenu()
         {
-            var modes = new string[]
+            void Pick(ScreenOrientationMode mode, ScreenOrientation req, string label)
             {
-                "🔄 Auto-Rotate / Sensor (Follow device rotation)",
-                "↔️ Lock Landscape (Horizontal)",
-                "↕️ Lock Portrait (Vertical)"
-            };
+                CurrentOrientationMode = mode;
+                RequestedOrientation = req;
+                SetupTouchControls();
+                Toast.MakeText(this, label, ToastLength.Short)?.Show();
+                ShowDisplayMenu();
+            }
 
-            new AlertDialog.Builder(this)
-                .SetTitle("Screen Orientation")
-                .SetItems(modes, (s, e) =>
-                {
-                    CurrentOrientationMode = e.Which switch
-                    {
-                        1 => ScreenOrientationMode.LockLandscape,
-                        2 => ScreenOrientationMode.LockPortrait,
-                        _ => ScreenOrientationMode.AutoRotate
-                    };
-
-                    RequestedOrientation = CurrentOrientationMode switch
-                    {
-                        ScreenOrientationMode.LockLandscape => ScreenOrientation.SensorLandscape,
-                        ScreenOrientationMode.LockPortrait => ScreenOrientation.SensorPortrait,
-                        _ => ScreenOrientation.Sensor
-                    };
-
-                    SetupTouchControls();
-                    Toast.MakeText(this, $"Orientation set to: {modes[e.Which]}", ToastLength.Short)?.Show();
-                })
-                .SetNegativeButton("Back", (s, e) => ShowDisplayMenu())
+            var cur = CurrentOrientationMode;
+            new MenuSheet(this, "Orientation")
+                .Item("Follow device", cur == ScreenOrientationMode.AutoRotate ? "Selected" : null,
+                    () => Pick(ScreenOrientationMode.AutoRotate, ScreenOrientation.Sensor, "Following device rotation"))
+                .Item("Lock landscape", cur == ScreenOrientationMode.LockLandscape ? "Selected" : null,
+                    () => Pick(ScreenOrientationMode.LockLandscape, ScreenOrientation.SensorLandscape, "Locked to landscape"))
+                .Item("Lock portrait", cur == ScreenOrientationMode.LockPortrait ? "Selected" : null,
+                    () => Pick(ScreenOrientationMode.LockPortrait, ScreenOrientation.SensorPortrait, "Locked to portrait"))
+                .Back("Back", ShowDisplayMenu)
                 .Show();
         }
 
         private void ShowAspectRatioSubmenu()
         {
-            var ratios = new string[]
+            void Pick(HostWindow.AspectRatioMode mode, string label)
             {
-                "📱 Auto-Fit Device (Dynamic Portrait & Landscape)",
-                "🖥️ 4:3 Original (PSX Centered)",
-                "📺 16:9 Widescreen",
-                "↔️ Stretch to Fill Screen"
-            };
+                HostWindow.CurrentAspectRatio = mode;
+                Toast.MakeText(this, label, ToastLength.Short)?.Show();
+                ShowDisplayMenu();
+            }
 
-            new AlertDialog.Builder(this)
-                .SetTitle("Aspect Ratio")
-                .SetItems(ratios, (s, e) =>
-                {
-                    HostWindow.CurrentAspectRatio = e.Which switch
-                    {
-                        0 => HostWindow.AspectRatioMode.AutoDevice,
-                        1 => HostWindow.AspectRatioMode.Original_4_3,
-                        2 => HostWindow.AspectRatioMode.Widescreen_16_9,
-                        3 => HostWindow.AspectRatioMode.Stretch,
-                        _ => HostWindow.AspectRatioMode.AutoDevice
-                    };
-                    Toast.MakeText(this, $"Aspect ratio set to: {ratios[e.Which]}", ToastLength.Short)?.Show();
-                })
-                .SetNegativeButton("Back", (s, e) => ShowDisplayMenu())
+            var cur = HostWindow.CurrentAspectRatio;
+            string? Mark(HostWindow.AspectRatioMode m) => cur == m ? "Selected" : null;
+
+            new MenuSheet(this, "Aspect ratio")
+                .Item("Fit device", Mark(HostWindow.AspectRatioMode.AutoDevice),
+                    () => Pick(HostWindow.AspectRatioMode.AutoDevice, "Fitting the device"))
+                .Item("4:3 original", Mark(HostWindow.AspectRatioMode.Original_4_3),
+                    () => Pick(HostWindow.AspectRatioMode.Original_4_3, "4:3 original"))
+                .Item("16:9 widescreen", Mark(HostWindow.AspectRatioMode.Widescreen_16_9),
+                    () => Pick(HostWindow.AspectRatioMode.Widescreen_16_9, "16:9 widescreen"))
+                .Item("Stretch to fill", Mark(HostWindow.AspectRatioMode.Stretch),
+                    () => Pick(HostWindow.AspectRatioMode.Stretch, "Stretched to fill"))
+                .Back("Back", ShowDisplayMenu)
                 .Show();
         }
 
         private void ShowTouchControlsMenu()
         {
             int mode = ConfigManager.View.TouchControlMode;
-            string modeStr = mode == 0 ? "🔲 Four Arrows (D-Pad)" : "🕹️ Virtual Analog Joystick";
 
-            var options = new string[]
+            void SetOpacity(float v, string label)
             {
-                $"Movement Style: {modeStr}",
-                $"Touch Overlay: {(_touchVisible ? "Visible" : "Hidden")}",
-                "Opacity: 100%",
-                "Opacity: 70%",
-                "Opacity: 40%"
-            };
+                _touchOpacity = v;
+                if (_touchView != null) { _touchView.TouchOpacity = v; _touchView.Invalidate(); }
+                Toast.MakeText(this, label, ToastLength.Short)?.Show();
+                ShowTouchControlsMenu();
+            }
 
-            new AlertDialog.Builder(this)
-                .SetTitle("Touch Control Settings")
-                .SetItems(options, (s, e) =>
+            new MenuSheet(this, "Touch controls")
+                .Section("Movement")
+                .Item("Style", mode == 0 ? "D-pad" : "Analog stick", () =>
                 {
-                    if (e.Which == 0)
+                    int next = mode == 0 ? 1 : 0;
+                    ConfigManager.View.TouchControlMode = next;
+                    try { ConfigManager.SaveView(); } catch { }
+                    if (_touchView != null)
                     {
-                        int nextMode = mode == 0 ? 1 : 0;
-                        ConfigManager.View.TouchControlMode = nextMode;
-                        try { ConfigManager.SaveView(); } catch { }
-                        if (_touchView != null)
-                        {
-                            _touchView.ControlMode = (TouchControlMode)nextMode;
-                            _touchView.Invalidate();
-                        }
-                        Toast.MakeText(this, $"Movement style: {(nextMode == 0 ? "Four Arrows (D-Pad)" : "Virtual Joystick")}", ToastLength.Short)?.Show();
+                        _touchView.ControlMode = (TouchControlMode)next;
+                        _touchView.Invalidate();
                     }
-                    else if (e.Which == 1)
-                    {
-                        _touchVisible = !_touchVisible;
-                        if (_touchView != null) { _touchView.TouchVisible = _touchVisible; _touchView.Invalidate(); }
-                    }
-                    else if (e.Which == 2) { _touchOpacity = 1.0f; if (_touchView != null) { _touchView.TouchOpacity = _touchOpacity; _touchView.Invalidate(); } }
-                    else if (e.Which == 3) { _touchOpacity = 0.7f; if (_touchView != null) { _touchView.TouchOpacity = _touchOpacity; _touchView.Invalidate(); } }
-                    else if (e.Which == 4) { _touchOpacity = 0.4f; if (_touchView != null) { _touchView.TouchOpacity = _touchOpacity; _touchView.Invalidate(); } }
+                    Toast.MakeText(this, next == 0 ? "D-pad" : "Analog stick", ToastLength.Short)?.Show();
+                    ShowTouchControlsMenu();
                 })
-                .SetNegativeButton("Back", (s, e) => ShowMenuDialog())
+                .Section("Overlay")
+                .Toggle("Show buttons", _touchVisible, on =>
+                {
+                    _touchVisible = on;
+                    if (_touchView != null) { _touchView.TouchVisible = on; _touchView.Invalidate(); }
+                })
+                .Item("Opacity", $"{(int)(_touchOpacity * 100)}%", () =>
+                    new MenuSheet(this, "Opacity")
+                        .Item("Solid", _touchOpacity >= 0.99f ? "Selected" : null, () => SetOpacity(1.0f, "Opacity 100%"))
+                        .Item("Medium", _touchOpacity is > 0.5f and < 0.99f ? "Selected" : null, () => SetOpacity(0.7f, "Opacity 70%"))
+                        .Item("Faint", _touchOpacity <= 0.5f ? "Selected" : null, () => SetOpacity(0.4f, "Opacity 40%"))
+                        .Back("Back", ShowTouchControlsMenu)
+                        .Show())
+                .Back("Back", ShowMenuDialog)
                 .Show();
         }
+
+        // --- Mods folder -----------------------------------------------------------------
+
+        private const string ModsPathKey = "AndroidModsPath";
+
+        /// <summary>
+        /// Where mods are loaded from. Defaults to the copy unpacked from the APK, but can be
+        /// pointed anywhere the app can read so mods can be added without rebuilding.
+        /// </summary>
+        private string ModsDir
+        {
+            get
+            {
+                try
+                {
+                    string chosen = ConfigManager.View.GetString(ModsPathKey);
+                    if (!string.IsNullOrWhiteSpace(chosen) && Directory.Exists(chosen)) return chosen;
+                }
+                catch { }
+                return System.IO.Path.Combine(FilesDir?.Path ?? "", "mods");
+            }
+        }
+
+        private string FriendlyModsDir(string dir)
+        {
+            if (dir.StartsWith(FilesDir?.Path ?? " ", StringComparison.OrdinalIgnoreCase)) return "App storage";
+            string ext = GetExternalFilesDir(null)?.AbsolutePath ?? " ";
+            if (dir.StartsWith(ext, StringComparison.OrdinalIgnoreCase)) return "Shared app folder";
+            return System.IO.Path.GetFileName(dir.TrimEnd('/')) is { Length: > 0 } n ? n : dir;
+        }
+
+        private void ShowModsFolderMenu()
+        {
+            var candidates = new List<(string Label, string Hint, string Path)>();
+            string internalMods = System.IO.Path.Combine(FilesDir?.Path ?? "", "mods");
+            candidates.Add(("App storage", "Bundled mods, unpacked from the app", internalMods));
+
+            string? ext = GetExternalFilesDir(null)?.AbsolutePath;
+            if (!string.IsNullOrEmpty(ext))
+                candidates.Add(("Shared app folder", "Reachable over USB, no permission needed",
+                    System.IO.Path.Combine(ext, "mods")));
+
+            candidates.Add(("SymphonyRecomp on storage", "/sdcard/SymphonyRecomp/mods",
+                "/sdcard/SymphonyRecomp/mods"));
+
+            string current = ModsDir;
+            var sheet = new MenuSheet(this, "Mods folder", "Takes effect after a restart");
+            foreach (var entry in candidates)
+            {
+                var c = entry;
+                bool selected = string.Equals(c.Path.TrimEnd('/'), current.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+                bool exists = Directory.Exists(c.Path);
+                sheet.Item(c.Label, selected ? "In use" : exists ? "Available" : "Will be created", () =>
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(c.Path);
+                        ConfigManager.View.SetString(ModsPathKey, c.Path);
+                        ConfigManager.SaveView(null);
+                        Toast.MakeText(this, $"Mods folder set to {c.Label}. Restart to load from it.", ToastLength.Long)?.Show();
+                    }
+                    catch (Exception ex)
+                    {
+                        Toast.MakeText(this, $"Could not use that folder: {ex.Message}", ToastLength.Long)?.Show();
+                    }
+                    ShowModsFolderMenu();
+                });
+            }
+
+            sheet.Section("Current path")
+                 .Item(current, null, () =>
+                     Toast.MakeText(this, current, ToastLength.Long)?.Show())
+                 .Back("Back", ShowModsMenu)
+                 .Show();
+        }
+
+        // --- Quality of life -------------------------------------------------------------
+
+        private static string QolSummary()
+        {
+            int on = 0;
+            if (QualityOfLife.ColorBlind) on++;
+            if (QualityOfLife.RemoveFlashing) on++;
+            if (QualityOfLife.BugFixes) on++;
+            if (QualityOfLife.ClearFile) on++;
+            if (QualityOfLife.AntiFreeze) on++;
+            if (QualityOfLife.InfiniteWingSmash) on++;
+            if (QualityOfLife.UseEasySpellInput) on++;
+            if (QualityOfLife.IncreaseInvincibilityFrames) on++;
+            if (QualityOfLife.RestoreFairySong) on++;
+            return on == 0 ? "All off" : $"{on} on";
+        }
+
+        private void ShowQualityOfLifeMenu()
+        {
+            void Save() { try { QualityOfLife.Save(); } catch { } }
+
+            new MenuSheet(this, "Quality of life", "Saved between sessions")
+                .Section("Accessibility")
+                .Toggle("Colour blind fixes", QualityOfLife.ColorBlind, v => { QualityOfLife.ColorBlind = v; Save(); })
+                .Toggle("Remove screen flashes", QualityOfLife.RemoveFlashing, v => { QualityOfLife.RemoveFlashing = v; Save(); })
+                .Toggle("No screen freeze", QualityOfLife.AntiFreeze, v => { QualityOfLife.AntiFreeze = v; Save(); })
+                .Section("Play")
+                .Toggle("Bug fixes", QualityOfLife.BugFixes, v => { QualityOfLife.BugFixes = v; Save(); })
+                .Toggle("Easy spell inputs", QualityOfLife.UseEasySpellInput, v => { QualityOfLife.UseEasySpellInput = v; Save(); })
+                .Toggle("Infinite wing smash", QualityOfLife.InfiniteWingSmash, v => { QualityOfLife.InfiniteWingSmash = v; Save(); })
+                .Toggle("More invincibility frames", QualityOfLife.IncreaseInvincibilityFrames, v => { QualityOfLife.IncreaseInvincibilityFrames = v; Save(); })
+                .Toggle("Clear file", QualityOfLife.ClearFile, v => { QualityOfLife.ClearFile = v; Save(); })
+                .Section("Enhancements")
+                .Toggle("Restore Sprite's Nocturne song", QualityOfLife.RestoreFairySong, v => { QualityOfLife.RestoreFairySong = v; Save(); })
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        // --- Stats and level -------------------------------------------------------------
+
+        private static string SafeStat(Func<string> get)
+        {
+            try { return get(); } catch { return "-"; }
+        }
+
+        private void ShowStatsMenu()
+        {
+            void Edit(string title, int cur, int min, int max, Action<int> set) =>
+                MenuSheet.PromptNumber(this, title, cur, min, max, v =>
+                {
+                    try { set(v); } catch (Exception ex) { Toast.MakeText(this, ex.Message, ToastLength.Long)?.Show(); }
+                    ShowStatsMenu();
+                });
+
+            try
+            {
+                new MenuSheet(this, "Stats", SafeStat(() => $"{Player.Character}  ·  Level {Player.Level}"))
+                    .Section("Vitals")
+                    .Item("HP", SafeStat(() => $"{Player.Hp} / {Player.HpMax}"),
+                        () => Edit("HP", Player.Hp, 0, 9999, v => Player.Hp = v))
+                    .Item("HP max", SafeStat(() => Player.HpMax.ToString()),
+                        () => Edit("HP max", Player.HpMax, 1, 9999, v => Player.HpMax = v))
+                    .Item("MP", SafeStat(() => $"{Player.Mp} / {Player.MpMax}"),
+                        () => Edit("MP", Player.Mp, 0, 9999, v => Player.Mp = v))
+                    .Item("MP max", SafeStat(() => Player.MpMax.ToString()),
+                        () => Edit("MP max", Player.MpMax, 1, 9999, v => Player.MpMax = v))
+                    .Item("Hearts", SafeStat(() => $"{Player.Hearts} / {Player.HeartsMax}"),
+                        () => Edit("Hearts", Player.Hearts, 0, 999, v => Player.Hearts = v))
+                    .Item("Hearts max", SafeStat(() => Player.HeartsMax.ToString()),
+                        () => Edit("Hearts max", Player.HeartsMax, 1, 999, v => Player.HeartsMax = v))
+                    .Item("Full heal", "HP, MP, hearts", () =>
+                    {
+                        try { Player.FullHeal(); Toast.MakeText(this, "Healed", ToastLength.Short)?.Show(); } catch { }
+                        ShowStatsMenu();
+                    })
+                    .Section("Attributes")
+                    .Item("Strength", SafeStat(() => Player.Strength.ToString()),
+                        () => Edit("Strength", Player.Strength, 1, 999, v => Player.Strength = v))
+                    .Item("Constitution", SafeStat(() => Player.Constitution.ToString()),
+                        () => Edit("Constitution", Player.Constitution, 1, 999, v => Player.Constitution = v))
+                    .Item("Intelligence", SafeStat(() => Player.Intelligence.ToString()),
+                        () => Edit("Intelligence", Player.Intelligence, 1, 999, v => Player.Intelligence = v))
+                    .Item("Luck", SafeStat(() => Player.Luck.ToString()),
+                        () => Edit("Luck", Player.Luck, 1, 999, v => Player.Luck = v))
+                    .Section("Progress")
+                    .Item("Level", SafeStat(() => Player.Level.ToString()),
+                        () => Edit("Level", Player.Level, 1, 99, v => Player.Level = v))
+                    .Item("Experience", SafeStat(() => Player.Exp.ToString("N0")),
+                        () => Edit("Experience", Player.Exp, 0, 9999999, v => Player.Exp = v))
+                    .Item("Gold", SafeStat(() => Player.Gold.ToString("N0")),
+                        () => Edit("Gold", Player.Gold, 0, 999999, v => Player.Gold = v))
+                    .Back("Back", ShowMenuDialog)
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Stats need a game in progress: {ex.Message}", ToastLength.Long)?.Show();
+            }
+        }
+
+        // --- Movement --------------------------------------------------------------------
+
+        private static string MovementSummary()
+        {
+            var on = new List<string>();
+            if (MovementCheat.InfiniteJump) on.Add("fly");
+            if (MovementCheat.NoClip) on.Add("no clip");
+            if (MovementCheat.Invincible) on.Add("invincible");
+            return on.Count == 0 ? "Off" : string.Join(", ", on);
+        }
+
+        private void ShowMovementMenu()
+        {
+            new MenuSheet(this, "Movement")
+                .Section("Toggles")
+                .Toggle("Infinite jump", MovementCheat.InfiniteJump, v => MovementCheat.InfiniteJump = v)
+                .Toggle("No clip", MovementCheat.NoClip, v => MovementCheat.NoClip = v)
+                .Toggle("Invincible", MovementCheat.Invincible, v => MovementCheat.Invincible = v)
+                .Section("Speed")
+                .Toggle("Override speed", MovementCheat.SpeedOverride, v => MovementCheat.SpeedOverride = v)
+                .Item("Speed multiplier", $"{MovementCheat.SpeedMul:0.0}x", () =>
+                    MenuSheet.PromptNumber(this, "Speed multiplier (x10)", (int)(MovementCheat.SpeedMul * 10), 1, 100, v =>
+                    {
+                        MovementCheat.SpeedMul = v / 10f;
+                        ShowMovementMenu();
+                    }))
+                .Section("Jump")
+                .Toggle("Override jump", MovementCheat.JumpOverride, v => MovementCheat.JumpOverride = v)
+                .Item("Jump strength", $"{MovementCheat.JumpStrength:0.0}", () =>
+                    MenuSheet.PromptNumber(this, "Jump strength", (int)MovementCheat.JumpStrength, 1, 40, v =>
+                    {
+                        MovementCheat.JumpStrength = v;
+                        ShowMovementMenu();
+                    }))
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        // --- Inventory -------------------------------------------------------------------
+
+        private void ShowInventoryMenu()
+        {
+            new MenuSheet(this, "Inventory")
+                .Item("Hand items", "Weapons, shields, usables", () => ShowItemList("Hand items", true))
+                .Item("Body items", "Armour, cloaks, accessories", () => ShowItemList("Body items", false))
+                .Item("Relics", "Grant or clear", ShowRelicsMenu)
+                .Item("Spells", "Grant or clear", ShowSpellsMenu)
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        private void ShowItemList(string title, bool hand)
+        {
+            var sheet = new MenuSheet(this, title, "Tap an entry to set how many you carry");
+            var catalogue = hand
+                ? Enum.GetValues<HandItem>().Select(v => (Display: Spaced(v.ToString()), Id: (int)v))
+                : Enum.GetValues<BodyItem>().Select(v => (Display: Spaced(v.ToString()), Id: (int)v));
+            catalogue = catalogue.Where(e => e.Id != 0).GroupBy(e => e.Id).Select(g => g.First()).ToList();
+
+            sheet.Item("Clear all", null, () =>
+            {
+                try
+                {
+                    foreach (var it in catalogue) SetItemCount(hand, it.Id, 0);
+                }
+                catch { }
+                ShowItemList(title, hand);
+            });
+
+            try
+            {
+                // Carried items first, so what you own is reachable without scrolling the
+                // whole catalogue.
+                foreach (var entry in catalogue
+                             .Select(e => (e.Display, e.Id, Count: hand ? Inventory.GetHandCount(e.Id) : Inventory.GetBodyCount(e.Id)))
+                             .OrderByDescending(e => e.Count > 0)
+                             .ThenBy(e => e.Display))
+                {
+                    var it = entry;
+                    sheet.Item(it.Display, it.Count > 0 ? it.Count.ToString() : null, () =>
+                        MenuSheet.PromptNumber(this, it.Display, it.Count, 0, 255, v =>
+                        {
+                            try { SetItemCount(hand, it.Id, v); } catch { }
+                            ShowItemList(title, hand);
+                        }));
+                }
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Inventory needs a game in progress: {ex.Message}", ToastLength.Long)?.Show();
+            }
+
+            sheet.Back("Back", ShowInventoryMenu).Show();
+        }
+
+        /// <summary>
+        /// Sets how many of an item you carry. SoTN keeps the menu's item list in a separate
+        /// order array from the counts, so writing the count alone leaves the item invisible
+        /// in game - Grant*Item inserts it into that list as well.
+        /// </summary>
+        private static void SetItemCount(bool hand, int id, int value)
+        {
+            int current = hand ? Inventory.GetHandCount(id) : Inventory.GetBodyCount(id);
+            if (value > 0 && current == 0)
+            {
+                if (hand) Inventory.GrantHandItem(id, value); else Inventory.GrantBodyItem(id, value);
+                return;
+            }
+            if (hand) Inventory.SetHandCount(id, value); else Inventory.SetBodyCount(id, value);
+        }
+
+        private void ShowRelicsMenu()
+        {
+            var sheet = new MenuSheet(this, "Relics");
+            sheet.Item("Grant all", null, () =>
+            {
+                try { foreach (Relic r in Enum.GetValues<Relic>()) Inventory.GiveRelic(r, true); } catch { }
+                ShowRelicsMenu();
+            });
+            sheet.Item("Clear all", null, () =>
+            {
+                try { foreach (Relic r in Enum.GetValues<Relic>()) Inventory.GiveRelic(r, false); } catch { }
+                ShowRelicsMenu();
+            });
+            sheet.Section("Owned");
+            try
+            {
+                foreach (Relic relic in Enum.GetValues<Relic>())
+                {
+                    var r = relic;
+                    sheet.Toggle(Spaced(r.ToString()), Inventory.HasRelic(r), v =>
+                    {
+                        try { Inventory.GiveRelic(r, v); } catch { }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Relics need a game in progress: {ex.Message}", ToastLength.Long)?.Show();
+            }
+            sheet.Back("Back", ShowInventoryMenu).Show();
+        }
+
+        private void ShowSpellsMenu()
+        {
+            var sheet = new MenuSheet(this, "Spells");
+            try
+            {
+                foreach (Spell spell in Enum.GetValues<Spell>())
+                {
+                    var s = spell;
+                    sheet.Toggle(Spaced(s.ToString()), Inventory.HasSpell(s), v =>
+                    {
+                        try { Inventory.SetSpellLearned(s, v); } catch { }
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Spells need a game in progress: {ex.Message}", ToastLength.Long)?.Show();
+            }
+            sheet.Back("Back", ShowInventoryMenu).Show();
+        }
+
+        /// <summary>Turns PascalCase enum names into readable labels.</summary>
+        private static string Spaced(string s)
+        {
+            var sb = new System.Text.StringBuilder(s.Length + 8);
+            for (int i = 0; i < s.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(s[i]) && !char.IsUpper(s[i - 1])) sb.Append(' ');
+                sb.Append(s[i]);
+            }
+            return sb.ToString();
+        }
+
+        private string SlotStamp(string baseDir, int slot)
+        {
+            string info = SaveStateManager.GetSlotInfo(baseDir, slot);
+            int colon = info.IndexOf(':');
+            string tail = colon >= 0 ? info[(colon + 1)..].Trim() : info;
+            return tail == "(Empty)" ? "Empty" : tail;
+        }
+
+        private static string SafeLevel()
+        {
+            try { return Player.Level.ToString(); } catch { return "-"; }
+        }
+
+        private static string SafeGold()
+        {
+            try { return Player.Gold.ToString("N0"); } catch { return "-"; }
+        }
+
+        private static string AspectLabelShort() => HostWindow.CurrentAspectRatio switch
+        {
+            HostWindow.AspectRatioMode.AutoDevice => "Fit device",
+            HostWindow.AspectRatioMode.Widescreen_16_9 => "16:9",
+            HostWindow.AspectRatioMode.Stretch => "Stretch",
+            _ => "4:3"
+        };
 
         private void AutoDetectDisc()
         {

@@ -45,5 +45,8 @@
     <AndroidAsset Include="config\**\*" />
     <AndroidAsset Include="disc\**\*" />
     <AndroidAsset Include="Android\*.png" />
+    <!-- Ship the bundled mods. The submodule git metadata would otherwise be packaged too. -->
+    <AndroidAsset Include="mods\**\*"
+                  Exclude="mods\.git\**;mods\**\.git\**;mods\**\.git;mods\.gitignore;mods\.gitmodules;mods\.cache\**" />
   </ItemGroup>
 </Project>
