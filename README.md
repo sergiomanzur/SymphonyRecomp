@@ -40,7 +40,7 @@ never would — that's the point.
 
 **[Get the APK from the releases page →](https://github.com/sergiomanzur/SymphonyRecomp/releases/latest)**
 
-Current release: **Beta 0.9** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
+Current release: **Beta 0.9.1** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
 
 The APK holds **no game data**. You supply your own disc the first time you open it, and the
 app never asks again. If your device refuses the install, allow "install unknown apps" for
@@ -87,6 +87,10 @@ just the layout a standard dump arrives in.
   DualSense), with PlayStation / Xbox / Nintendo button layouts so the face buttons land
   where you expect.
 - **Save states** — five slots.
+- **Memory cards** — export a save to share or back up, import one from the desktop build or
+  an emulator. Raw `.mcr`/`.mcd`/`.sav` plus DexDrive and VGS files.
+- **True widescreen** — 16:9 and fit-to-screen render more of the level rather than
+  stretching a 4:3 picture sideways.
 - **Quality of life** — colour blind fixes, remove screen flashes, bug fixes, easy spell
   inputs, extra invincibility frames and more, all carried over from the desktop build.
 - **Cheats, stats and inventory** — heal, level, gold, attributes, and a full item, relic
