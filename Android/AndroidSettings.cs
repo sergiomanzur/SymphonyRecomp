@@ -76,6 +76,70 @@ namespace RecompOne.SoTN.Android
             set { V.SetInt(KeyPadLayout, (int)value); Save(); ApplyPadLayout(value); }
         }
 
+        /// <summary>
+        /// The device's landscape ratio - 2.22 on a 20:9 phone, 1.78 on a 16:9 handheld.
+        /// Measured long edge over short edge so it does not flip when the player rotates:
+        /// changing how much of the level is rendered mid-game would be jarring, and in
+        /// portrait the frame is boxed anyway.
+        /// </summary>
+        public static float DeviceAspect { get; set; } = 16f / 9f;
+
+        /// <summary>
+        /// Renders the game at the ratio the chosen mode asks for.
+        ///
+        /// This is what makes "16:9" actually mean 16:9. The aspect setting used to change
+        /// only the rectangle the finished frame was drawn into, so a 4:3 picture was pulled
+        /// sideways to fill it. A wider picture has to be rendered wider in the first place,
+        /// which is WidescreenPatch's job - the same path the desktop display settings drive.
+        /// </summary>
+        public static void ApplyAspect(HostWindow.AspectRatioMode mode)
+        {
+            try
+            {
+                HostWindow.CurrentAspectRatio = mode;
+
+                float target = mode switch
+                {
+                    HostWindow.AspectRatioMode.Widescreen_16_9 => 16f / 9f,
+                    HostWindow.AspectRatioMode.AutoDevice => DeviceAspect,
+                    // 4:3 and Stretch both keep the original framing. Stretch then fills the
+                    // screen with it on purpose, which is the one place distortion is wanted.
+                    _ => 0f,
+                };
+
+                bool original = target <= 0f;
+                // Upstream's own bounds. Past these the widescreen hooks start showing seams
+                // at the edges of rooms.
+                if (!original) target = Math.Clamp(target, 1f, 3f);
+
+                // Keep the PlayStation's non-square pixels, so the picture keeps the shape the
+                // game was drawn for. The alternative - the patch's default - presents the
+                // 256x240 stage with square pixels, which is narrower than 4:3 and would have
+                // quietly changed how "4:3 original" looks. Widening then only adds level to
+                // the sides instead of reshaping the sprites.
+                Recompiled.WidescreenPatch.Unstretch = false;
+                V.SetBool("WidescreenUnstretch", false);
+
+                Recompiled.WidescreenPatch.OriginalAspect = original;
+                V.SetBool("WidescreenOriginalAspect", original);
+
+                if (!original)
+                {
+                    // Written before Refresh: the patch reads these on its first initialisation.
+                    V.SetFloat("WidescreenAspect", target);
+                    RecompOne.Runtime.Hle.Display.TargetAspect = target;
+                    Recompiled.WidescreenPatch.StageAspect = target;
+                }
+
+                Recompiled.WidescreenPatch.Refresh();
+                Save();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Android] Could not apply the aspect ratio: {ex.Message}");
+            }
+        }
+
         static int Clamp(int v, int lo, int hi) => v < lo ? lo : v > hi ? hi : v;
 
         static void Save()
@@ -131,7 +195,7 @@ namespace RecompOne.SoTN.Android
         {
             try
             {
-                HostWindow.CurrentAspectRatio = Aspect;
+                ApplyAspect(Aspect);
                 ApplyPadLayout(Pad);
             }
             catch
@@ -166,7 +230,7 @@ namespace RecompOne.SoTN.Android
             try { Recompiled.QualityOfLife.Save(); } catch { }
 
             ApplyPadLayout(PadLayout.PlayStation);
-            HostWindow.CurrentAspectRatio = HostWindow.AspectRatioMode.AutoDevice;
+            ApplyAspect(HostWindow.AspectRatioMode.AutoDevice);
             Save();
         }
     }

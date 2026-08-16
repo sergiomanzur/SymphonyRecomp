@@ -57,6 +57,22 @@ namespace RecompOne.SoTN.Android
             Directory.SetCurrentDirectory(filesPath);
             Console.WriteLine($"[Android] Set current directory to: {filesPath}");
 
+            // The long edge over the short edge, so "Fit device" renders at this screen's real
+            // shape. Taken once and kept: deriving it per-orientation would change how much of
+            // the level is drawn every time the player rotates.
+            try
+            {
+                var dm = Resources?.DisplayMetrics;
+                if (dm != null && dm.WidthPixels > 0 && dm.HeightPixels > 0)
+                {
+                    float lo = Math.Min(dm.WidthPixels, dm.HeightPixels);
+                    float hi = Math.Max(dm.WidthPixels, dm.HeightPixels);
+                    AndroidSettings.DeviceAspect = hi / lo;
+                    Console.WriteLine($"[Android] Device aspect: {AndroidSettings.DeviceAspect:0.###}");
+                }
+            }
+            catch { }
+
             CopyAssets("assets");
             CopyAssets("config");
             CopyAssets("Android");
@@ -109,6 +125,12 @@ namespace RecompOne.SoTN.Android
                 // every launch started with all of them off.
                 try { QualityOfLife.Load(); }
                 catch (Exception ex) { Console.Error.WriteLine($"[Android] QoL settings failed to load: {ex.Message}"); }
+
+                // Program.cs does this on desktop. The widescreen hooks are already compiled into
+                // generated/ and are being called, but without this listener nothing ever sets
+                // Display.WideAspect, so the game renders 4:3 however wide the menu asks for.
+                try { WidescreenPatch.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Widescreen registration failed: {ex.Message}"); }
 
                 // Aspect ratio and pad layout are plain statics in the runtime, so restore the
                 // saved choices before the game starts. Orientation is applied in OnPostCreate,
@@ -529,10 +551,10 @@ namespace RecompOne.SoTN.Android
         {
             string aspectStr = HostWindow.CurrentAspectRatio switch
             {
-                HostWindow.AspectRatioMode.AutoDevice => "📱 Auto-Fit (Portrait & Landscape)",
-                HostWindow.AspectRatioMode.Widescreen_16_9 => "16:9 Widescreen",
-                HostWindow.AspectRatioMode.Stretch => "Stretch to Screen",
-                _ => "4:3 Original"
+                HostWindow.AspectRatioMode.AutoDevice => $"Fit device ({AndroidSettings.DeviceAspect:0.##}:1)",
+                HostWindow.AspectRatioMode.Widescreen_16_9 => "16:9 widescreen",
+                HostWindow.AspectRatioMode.Stretch => "Stretch to fill",
+                _ => "4:3 original"
             };
 
             string orientStr = CurrentOrientationMode switch
@@ -591,8 +613,9 @@ namespace RecompOne.SoTN.Android
         {
             void Pick(HostWindow.AspectRatioMode mode, string label)
             {
-                HostWindow.CurrentAspectRatio = mode;
                 AndroidSettings.Aspect = mode;
+                // Re-renders the game at this ratio rather than scaling the old frame into it.
+                AndroidSettings.ApplyAspect(mode);
                 Toast.MakeText(this, label, ToastLength.Short)?.Show();
                 ShowDisplayMenu();
             }
