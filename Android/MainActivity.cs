@@ -322,6 +322,7 @@ namespace RecompOne.SoTN.Android
                         .Section("Save")
                         .Item("Save state", used == 0 ? "5 slots" : $"{used} of 5 used", ShowSaveStateMenu)
                         .Item("Load state", used == 0 ? "No saves" : $"{used} available", ShowLoadStateMenu)
+                        .Item("Memory cards", "Import or export saves", ShowMemoryCardMenu)
                         .Item("Mods", $"{ModLoader.Mods.Count} installed", ShowModsMenu)
                         .Section("System")
                         .Item("Display", AspectLabelShort(), ShowDisplayMenu)
@@ -1329,6 +1330,21 @@ namespace RecompOne.SoTN.Android
         protected override void OnActivityResult(int requestCode, Result resultCode, Intent? data)
         {
             base.OnActivityResult(requestCode, resultCode, data);
+
+            if (requestCode == ExportCardRequest || requestCode == ExportCardRequest + 1)
+            {
+                if (resultCode == Result.Ok && data?.Data is { } outUri)
+                    ExportCardTo(requestCode - ExportCardRequest, outUri);
+                return;
+            }
+
+            if (requestCode == ImportCardRequest || requestCode == ImportCardRequest + 1)
+            {
+                if (resultCode == Result.Ok && data?.Data is { } inUri)
+                    ImportCardFrom(requestCode - ImportCardRequest, inUri);
+                return;
+            }
+
             if (requestCode != PickDiscRequest) return;
 
             if (resultCode != Result.Ok || data == null)
@@ -1453,6 +1469,191 @@ namespace RecompOne.SoTN.Android
                 _discSetupDialog = null;
                 ShowDiscSetup(error);
             });
+        }
+
+        // --- Memory cards ----------------------------------------------------------------
+        //
+        // The card lives in app-private storage where nothing else can reach it, so without
+        // this a save could never leave the phone or come back from the desktop build.
+
+        private const int ExportCardRequest = 0x5EC0; // +card index
+        private const int ImportCardRequest = 0x5EC2; // +card index
+
+        /// <summary>Raw PSX card image, the size every emulator agrees on.</summary>
+        private const int CardSize = 0x20000;
+
+        /// <summary>
+        /// Headers other tools wrap the same 128 KB payload in. Accepting them means a save
+        /// exported from a DexDrive or VGS still imports without being converted first.
+        /// </summary>
+        private static readonly (long Total, int Skip, string Name)[] CardWrappers =
+        {
+            (CardSize, 0, "raw"),
+            (CardSize + 3904, 3904, "DexDrive"),
+            (CardSize + 64, 64, "VGS"),
+        };
+
+        private string CardPath(int index)
+        {
+            string p = "";
+            try { p = index == 0 ? ConfigManager.Game.CardAPath : ConfigManager.Game.CardBPath; }
+            catch { }
+            if (string.IsNullOrWhiteSpace(p)) p = index == 0 ? "carda.sav" : "cardb.sav";
+            return System.IO.Path.IsPathRooted(p) ? p : System.IO.Path.Combine(FilesDir?.Path ?? "", p);
+        }
+
+        private string CardSummary(int index)
+        {
+            try
+            {
+                var fi = new FileInfo(CardPath(index));
+                return fi.Exists && fi.Length > 0 ? $"{fi.Length / 1024} KB" : "Empty";
+            }
+            catch { return "Empty"; }
+        }
+
+        private void ShowMemoryCardMenu()
+        {
+            new MenuSheet(this, "Memory cards", "Move saves on and off the device")
+                .Section("Card 1")
+                .Item("Export card 1", CardSummary(0), () => StartCardExport(0))
+                .Item("Import card 1", null, () => ConfirmCardImport(0))
+                .Section("Card 2")
+                .Item("Export card 2", CardSummary(1), () => StartCardExport(1))
+                .Item("Import card 2", null, () => ConfirmCardImport(1))
+                .Back("Back", ShowMenuDialog)
+                .Show();
+        }
+
+        private void StartCardExport(int index)
+        {
+            try
+            {
+                // The live card only reaches disk when the game writes, so push it out first
+                // or the export could be a save or two behind what the player just did.
+                try { (index == 0 ? global::RecompOne.Runtime.Runtime.CardA
+                                  : global::RecompOne.Runtime.Runtime.CardB)?.Flush(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Card flush failed: {ex.Message}"); }
+
+                if (!File.Exists(CardPath(index)))
+                {
+                    Toast.MakeText(this, "That card has no save data yet", ToastLength.Short)?.Show();
+                    return;
+                }
+
+                var intent = new Intent(Intent.ActionCreateDocument);
+                intent.AddCategory(Intent.CategoryOpenable);
+                intent.SetType("application/octet-stream");
+                intent.PutExtra(Intent.ExtraTitle, index == 0 ? "carda.sav" : "cardb.sav");
+                StartActivityForResult(intent, ExportCardRequest + index);
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Could not open the file picker: {ex.Message}", ToastLength.Long)?.Show();
+            }
+        }
+
+        private void ConfirmCardImport(int index)
+        {
+            MenuSheet.Confirm(this, $"Import card {index + 1}",
+                "The card on this device will be replaced by the file you choose, and the app will "
+                + "restart to load it. Export it first if you want to keep it.",
+                "Choose file", () =>
+                {
+                    try
+                    {
+                        var intent = new Intent(Intent.ActionOpenDocument);
+                        intent.AddCategory(Intent.CategoryOpenable);
+                        intent.SetType("*/*");
+                        StartActivityForResult(intent, ImportCardRequest + index);
+                    }
+                    catch (Exception ex)
+                    {
+                        Toast.MakeText(this, $"Could not open the file picker: {ex.Message}", ToastLength.Long)?.Show();
+                    }
+                });
+        }
+
+        private void ExportCardTo(int index, global::Android.Net.Uri uri)
+        {
+            try
+            {
+                using var src = File.OpenRead(CardPath(index));
+                using var dst = ContentResolver?.OpenOutputStream(uri);
+                if (dst == null)
+                {
+                    Toast.MakeText(this, "That location could not be written to", ToastLength.Long)?.Show();
+                    return;
+                }
+                src.CopyTo(dst);
+                dst.Flush();
+                Toast.MakeText(this, $"Card {index + 1} exported", ToastLength.Short)?.Show();
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Export failed: {ex.Message}", ToastLength.Long)?.Show();
+            }
+        }
+
+        private void ImportCardFrom(int index, global::Android.Net.Uri uri)
+        {
+            try
+            {
+                byte[] raw;
+                using (var src = ContentResolver?.OpenInputStream(uri))
+                {
+                    if (src == null)
+                    {
+                        Toast.MakeText(this, "That file could not be opened", ToastLength.Long)?.Show();
+                        return;
+                    }
+                    using var ms = new MemoryStream();
+                    src.CopyTo(ms);
+                    raw = ms.ToArray();
+                }
+
+                var match = Array.Find(CardWrappers, w => w.Total == raw.Length);
+                if (match.Total == 0)
+                {
+                    Toast.MakeText(this,
+                        $"That is not a PlayStation memory card ({raw.Length} bytes). Expected a 128 KB .mcr, .mcd or .sav.",
+                        ToastLength.Long)?.Show();
+                    return;
+                }
+
+                var card = new byte[CardSize];
+                Array.Copy(raw, match.Skip, card, 0, CardSize);
+
+                // "MC" marks a formatted card. Refusing anything else keeps a mis-picked file
+                // from wiping a real save.
+                if (card[0] != 0x4D || card[1] != 0x43)
+                {
+                    Toast.MakeText(this, "That card image is not formatted and was not imported",
+                                   ToastLength.Long)?.Show();
+                    return;
+                }
+
+                string path = CardPath(index);
+                string? dir = System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+                // Keep the outgoing card next to the new one; an import is otherwise the one
+                // action here with no way back.
+                try { if (File.Exists(path)) File.Copy(path, path + ".replaced", true); } catch { }
+
+                File.WriteAllBytes(path, card);
+                Console.WriteLine($"[Android] Imported {match.Name} card image into {path}");
+
+                // MemoryCard reads the file once when it is constructed and rewrites it on every
+                // save, so the running game would overwrite this the next time it wrote. Only a
+                // restart picks it up.
+                Toast.MakeText(this, "Card imported - restarting", ToastLength.Short)?.Show();
+                RestartApp();
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Import failed: {ex.Message}", ToastLength.Long)?.Show();
+            }
         }
 
         private void CopyAssets(string path)

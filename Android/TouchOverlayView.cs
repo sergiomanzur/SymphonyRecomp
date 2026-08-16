@@ -142,10 +142,12 @@ namespace RecompOne.SoTN.Android
             l.Circle   = new RectF(actLeft + cluster - btn, l.ActCY - half, actLeft + cluster, l.ActCY + half);
 
             // Shoulders sit directly above their cluster, keeping the top-right corner
-            // free for the menu and the hide toggle.
+            // free for the menu and the hide toggle. The separation is a share of the button
+            // size rather than a flat gap, so on a large screen the shoulders do not end up
+            // sitting right on top of a d-pad that grew with it.
             float shW = btn * 1.25f;
             float shH = btn * 0.55f;
-            float shBottom = actTop - gap;
+            float shBottom = actTop - MathF.Max(gap, btn * 0.35f);
             float shTop = shBottom - shH;
 
             l.L1 = new RectF(left, shTop, left + shW, shBottom);
@@ -230,6 +232,22 @@ namespace RecompOne.SoTN.Android
 
                 hitAnything = true;
 
+                // A pointer claims exactly one control. The movement and action clusters are
+                // hit-tested by radius, deliberately reaching past their artwork so presses
+                // near the edge still register - but nothing below used to stop, so a finger
+                // inside that radius AND inside a shoulder button pressed both at once. On the
+                // d-pad that meant Up and L2 together, since L2 sits directly above it.
+                if (l.L1.Contains(px, py)) { pL1 = true; continue; }
+                if (l.L2.Contains(px, py)) { pL2 = true; continue; }
+                if (l.R1.Contains(px, py)) { pR1 = true; continue; }
+                if (l.R2.Contains(px, py)) { pR2 = true; continue; }
+                if (l.Select.Contains(px, py)) { pSelect = true; continue; }
+                if (l.Start.Contains(px, py)) { pStart = true; continue; }
+
+                // Keep the clusters' generous reach from extending up into the shoulder row at
+                // all, so a high thumb aiming for Up is not answered by L2 either.
+                if (py <= l.L1.Bottom) continue;
+
                 float dx = px - l.DpadCX;
                 float dy = py - l.DpadCY;
                 float dist = MathF.Sqrt(dx * dx + dy * dy);
@@ -255,6 +273,7 @@ namespace RecompOne.SoTN.Android
 
                         Controller.LeftX = (byte)Math.Clamp(128 + (int)(normX * 127f), 0, 255);
                         Controller.LeftY = (byte)Math.Clamp(128 + (int)(normY * 127f), 0, 255);
+                        continue;
                     }
                 }
                 else if (dist <= l.DpadR * 1.4f && dist > 4f * l.Density)
@@ -265,6 +284,7 @@ namespace RecompOne.SoTN.Android
                     if (deg >= 22.5 && deg <= 157.5) pDown = true;
                     if (deg >= 112.5 || deg <= -112.5) pLeft = true;
                     if (deg >= -157.5 && deg <= -22.5) pUp = true;
+                    continue;
                 }
 
                 float ax = px - l.ActCX;
@@ -283,12 +303,6 @@ namespace RecompOne.SoTN.Android
                         pCircle = true;
                 }
 
-                if (l.L1.Contains(px, py)) pL1 = true;
-                if (l.L2.Contains(px, py)) pL2 = true;
-                if (l.R1.Contains(px, py)) pR1 = true;
-                if (l.R2.Contains(px, py)) pR2 = true;
-                if (l.Select.Contains(px, py)) pSelect = true;
-                if (l.Start.Contains(px, py)) pStart = true;
             }
 
             if (ControlMode == TouchControlMode.VirtualJoystick)
