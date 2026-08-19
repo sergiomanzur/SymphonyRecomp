@@ -37,12 +37,12 @@
     },
     {
       "address": "0x801B9BE8",
-      "name": "func_801B9BE8",
+      "name": "Random",
       "size": 48
     },
     {
       "address": "0x801B9C18",
-      "name": "func_801B9C18",
+      "name": "Update",
       "size": 764
     },
     {

@@ -42,7 +42,7 @@ public sealed class InventoryCheatPanel : IPanel
 
         if (RecompOne.Runtime.Runtime.Mem == null || !Cheats.InPlay())
         {
-            ImGui.TextDisabled(Localization.T("common.not_in_play"));
+            ImGui.TextWrapped(Localization.T("common.not_in_play"));
             
             IsOpen = open;
             ImGui.End();

@@ -152,12 +152,12 @@
     },
     {
       "address": "0x801A7670",
-      "name": "func_801A7670",
+      "name": "Random",
       "size": 48
     },
     {
       "address": "0x801A76A0",
-      "name": "func_801A76A0",
+      "name": "Update",
       "size": 764
     },
     {
@@ -202,7 +202,7 @@
     },
     {
       "address": "0x801A95F8",
-      "name": "func_801A95F8",
+      "name": "CreateEntitiesToTheRight",
       "size": 252
     },
     {
@@ -262,7 +262,7 @@
     },
     {
       "address": "0x801AAA88",
-      "name": "func_801AAA88",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

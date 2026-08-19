@@ -72,7 +72,7 @@
     },
     {
       "address": "0x801A2B60",
-      "name": "func_801A2B60",
+      "name": "Random",
       "size": 48
     },
     {
@@ -147,7 +147,7 @@
     },
     {
       "address": "0x801A4E98",
-      "name": "func_801A4E98",
+      "name": "CreateEntitiesBelow",
       "size": 276
     },
     {
@@ -167,7 +167,7 @@
     },
     {
       "address": "0x801A524C",
-      "name": "func_801A524C",
+      "name": "CreateEntityFromEntity",
       "size": 124
     },
     {
@@ -182,7 +182,7 @@
     },
     {
       "address": "0x801A5F78",
-      "name": "func_801A5F78",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

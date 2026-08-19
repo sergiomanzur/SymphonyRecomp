@@ -62,7 +62,7 @@
     },
     {
       "address": "0x8019ABF4",
-      "name": "func_8019ABF4",
+      "name": "Random",
       "size": 48
     },
     {
@@ -157,7 +157,7 @@
     },
     {
       "address": "0x8019D2E0",
-      "name": "func_8019D2E0",
+      "name": "CreateEntityFromEntity",
       "size": 124
     },
     {
@@ -172,7 +172,7 @@
     },
     {
       "address": "0x8019E00C",
-      "name": "func_8019E00C",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

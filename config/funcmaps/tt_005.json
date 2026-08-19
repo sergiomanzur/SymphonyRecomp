@@ -117,7 +117,7 @@
     },
     {
       "address": "0x80178810",
-      "name": "func_80178810",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

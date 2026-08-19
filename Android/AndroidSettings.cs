@@ -213,7 +213,7 @@ namespace RecompOne.SoTN.Android
             V.SetInt(KeyPadLayout, 0);
             V.SetString(KeyModsPath, "");
             V.TouchControlMode = 0;
-            V.NativeResolution = false;
+            V.RenderScale = 4;
             V.VSync = false;
 
             // The quality of life toggles live in the same file, so a reset should clear

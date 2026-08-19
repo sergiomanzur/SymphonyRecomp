@@ -132,6 +132,12 @@ namespace RecompOne.SoTN.Android
                 try { WidescreenPatch.Register(); }
                 catch (Exception ex) { Console.Error.WriteLine($"[Android] Widescreen registration failed: {ex.Message}"); }
 
+                // Also from Program.cs, and part of the same widescreen story: widening the
+                // Prologue exposes empty space to the left of the throne, and this listener
+                // draws the artwork that fills it. Without it that strip is just black.
+                try { ThroneLeftFill.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Throne fill registration failed: {ex.Message}"); }
+
                 // Aspect ratio and pad layout are plain statics in the runtime, so restore the
                 // saved choices before the game starts. Orientation is applied in OnPostCreate,
                 // once the activity can accept a request.
@@ -142,7 +148,13 @@ namespace RecompOne.SoTN.Android
                 Console.WriteLine($"[Android] Launching Entry.Run with CdPath = '{cdPath}'");
 
                 // Run the game!
-                var m = new PSMemory();
+                // 8 MB of work RAM, matching Program.cs on desktop. Retail hardware had 2 MB,
+                // and the widescreen hooks run out of it while building the extra tile columns
+                // a wider view needs, so rooms come up with chunks of background missing. The
+                // RAM is a plain byte[], so this costs the app about 16 MB once the freeze map
+                // beside it is counted.
+                const uint RamSize = 0x00800000;
+                var m = new PSMemory(RamSize);
                 Recompiled.Entry.Run(m, cdPath, "SymphonyRecomp");
             }
             catch (Exception ex)
@@ -570,12 +582,7 @@ namespace RecompOne.SoTN.Android
                 .Item("Orientation", orientStr, ShowOrientationSubmenu)
                 .Item("Aspect ratio", aspectStr, ShowAspectRatioSubmenu)
                 .Section("Rendering")
-                .Toggle("High resolution (4x)", !ConfigManager.View.NativeResolution, on =>
-                {
-                    ConfigManager.View.NativeResolution = !on;
-                    ConfigManager.SaveView(null);
-                    HostWindow.RequestGpuReset();
-                })
+                .Item("Render scale", RenderScaleLabel(ConfigManager.View.RenderScale), ShowRenderScaleSubmenu)
                 .Toggle("VSync", ConfigManager.View.VSync, on =>
                 {
                     ConfigManager.View.VSync = on;
@@ -584,6 +591,36 @@ namespace RecompOne.SoTN.Android
                 })
                 .Back("Back", ShowMenuDialog)
                 .Show();
+        }
+
+        static string RenderScaleLabel(int scale) => scale <= 1 ? "Native (1x)" : $"{scale}x";
+
+        /// <summary>
+        /// Picks the internal resolution the game is drawn at, the same setting the desktop
+        /// build exposes as a slider. It used to be a single "high resolution" toggle here,
+        /// which could only say 1x or 4x; on a phone 2x is often the better trade between a
+        /// clean picture and battery. The desktop asks for a restart after a change - Android
+        /// does not need to, because RequestGpuReset rebuilds the backend on the next frame.
+        /// </summary>
+        private void ShowRenderScaleSubmenu()
+        {
+            void Pick(int scale)
+            {
+                ConfigManager.View.RenderScale = scale;
+                ConfigManager.SaveView(null);
+                HostWindow.RequestGpuReset();
+                Toast.MakeText(this, $"Rendering at {RenderScaleLabel(scale)}", ToastLength.Short)?.Show();
+                ShowDisplayMenu();
+            }
+
+            int cur = ConfigManager.View.RenderScale;
+            var sheet = new MenuSheet(this, "Render scale", "Higher looks sharper and costs more battery");
+            foreach (int scale in new[] { 1, 2, 3, 4 })
+            {
+                int s = scale;
+                sheet.Item(RenderScaleLabel(s), cur == s ? "Selected" : null, () => Pick(s));
+            }
+            sheet.Back("Back", ShowDisplayMenu).Show();
         }
 
         private void ShowOrientationSubmenu()

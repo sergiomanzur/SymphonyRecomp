@@ -2160,6 +2160,12 @@
       "target": "Recompiled.FunctionFixes.ClockCollisionFix"
     },
     {
+      "overlay": "bo2",
+      "function": "func_801A6EF8",
+      "mode": "pre",
+      "target": "Recompiled.FunctionFixes.MinotaurAndWerewolfFix"
+    },
+    {
       "overlay": "dra",
       "function": "func_80118C28",
       "mode": "pre",
@@ -2234,14 +2240,26 @@
     {
       "overlay": "*",
       "function": "UpdateRoomPosition",
-      "mode": "post",
-      "target": "Recompiled.WidescreenPatch.PostUpdateRoomPosition"
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.UpdateRoomPositionWide"
     },
     {
       "overlay": "*",
       "function": "CreateEntityWhenInHorizontalRange",
       "mode": "pre",
-      "target": "Recompiled.WidescreenPatch.PreCreateEntityWhenInHorizontalRange"
+      "target": "Recompiled.WidescreenPatch.CreateEntityWhenInHorizontalRangeWide"
+    },
+    {
+      "overlay": "*",
+      "function": "CreateEntityWhenInVerticalRange",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.CreateEntityWhenInVerticalRangeWide"
+    },
+    {
+      "overlay": "*",
+      "function": "Update",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.UpdateWide"
     },
     {
       "overlay": "dra",
@@ -2250,23 +2268,17 @@
       "target": "Recompiled.WidescreenPatch.CamColWide"
     },
     {
-      "overlay": "*",
-      "function": "HitDetection",
-      "mode": "pre",
-      "target": "Recompiled.WidescreenPatch.PreHitDetection"
-    },
-    {
-      "overlay": "*",
-      "function": "HitDetection",
-      "mode": "post",
-      "target": "Recompiled.WidescreenPatch.PostHitDetection"
-    },
-    {
       "comment": "fix richter position on coleseum",
       "overlay": "bo2",
       "function": "func_801A7340",
       "mode": "pre",
       "target": "Recompiled.RichterCutscenePatch.ForceCenter"
+    },
+    {
+      "overlay": "*",
+      "function": "HitDetection",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.HitDetectionWide"
     }
   ]
 }

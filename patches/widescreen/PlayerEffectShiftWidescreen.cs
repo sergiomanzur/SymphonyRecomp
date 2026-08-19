@@ -10,6 +10,8 @@ public static partial class WidescreenPatch
     const int PlayerFxPolyPrims = 4;
     const int PlayerFxTilePrims = 16;
 
+    static void ShiftX(IMemory m, uint addr, int by) => m.WriteU16(addr, (ushort)(short)((short)m.ReadU16(addr) + by)); //shift it to the thing
+
     static int _playerFxShift;
     static uint _playerFxEntity;
 

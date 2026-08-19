@@ -41,6 +41,9 @@ public static partial class WidescreenPatch
     const int OtSize = 0x200;
     const int MaxDrawModes = 0x400;
     const int MaxSprt16 = 0x280;
+    const uint ExtSprite16Base = 0x80200000;
+    const int ExtMaxSprt16 = 0x2000;
+    const uint ExtSprite16Stride = (uint)ExtMaxSprt16 * 16;
     const int HorizTiles = 17;
     const int VertiTiles = 16;
     const int MaxBgLayers = 16;
@@ -280,17 +283,10 @@ public static partial class WidescreenPatch
                 layers[n++] = bg;
         }
 
-        int budget = 0;
-        if (marginCols > 0)
-        {
-            int stock = 0;
-            for (int i = 0; i < n; i++)
-                stock += CountStock(m, in layers[i]);
-            budget = Math.Max(0, MaxSprt16 - (int)sp16 - stock);
-        }
+        uint pool = ExtSprite16Base + (buf == Buf(1) ? ExtSprite16Stride : 0u);
 
         for (int i = 0; i < n; i++)
-            DrawLayer(m, in layers[i], buf, ot, bbX, bbY, marginCols, ref sp16, ref dm, ref budget);
+            DrawLayer(m, in layers[i], buf, pool, ot, bbX, bbY, marginCols, ref sp16, ref dm);
 
         m.WriteU32(GpuUsageAddr + 0x14, sp16);
         m.WriteU32(GpuUsageAddr + 0x00, dm);
@@ -328,32 +324,8 @@ public static partial class WidescreenPatch
         return true;
     }
 
-    static int CountStock(IMemory m, in Layer L)
-    {
-        int startTx = L.ScrollX >> 4, startTy = L.ScrollY >> 4;
-        if (L.Wrap) { startTx &= 0xF; startTy &= 0xF; }
-        int count = 0;
-        for (int i = 0; i < VertiTiles; i++)
-        {
-            int ty = startTy + i;
-            if (L.Wrap) ty &= 0xF;
-            if (ty < 0) continue;
-            if (ty >= L.RoomH) break;
-            int row = ty * L.RoomW;
-            for (int j = 0; j < HorizTiles; j++)
-            {
-                int tx = startTx + j;
-                if (L.Wrap) tx &= 0xF;
-                if (tx < 0) continue;
-                if (tx >= L.RoomW) break;
-                if (m.ReadU16(L.Layout + (uint)(row + tx) * 2) != 0) count++;
-            }
-        }
-        return count;
-    }
-
-    static void DrawLayer(IMemory m, in Layer L, uint buf, uint ot, int bbX, int bbY,
-        int marginCols, ref uint sp16, ref uint dm, ref int budget)
+    static void DrawLayer(IMemory m, in Layer L, uint buf, uint pool, uint ot, int bbX, int bbY,
+        int marginCols, ref uint sp16, ref uint dm)
     {
         int subX = L.ScrollX & 0xF, startTx = L.ScrollX >> 4;
         int subY = L.ScrollY & 0xF, startTy = L.ScrollY >> 4;
@@ -377,10 +349,7 @@ public static partial class WidescreenPatch
                 if (tx >= L.RoomW) break;
                 ushort tile = m.ReadU16(L.Layout + (uint)(row + tx) * 2);
                 if (tile == 0) continue;
-                bool marginTile = j < 0 || j >= HorizTiles;
-                if (marginTile && budget <= 0) continue;
-                if (sp16 >= MaxSprt16) continue;
-                if (marginTile) budget--;
+                if (sp16 >= ExtMaxSprt16) continue;
 
                 byte g = m.ReadU8(L.GfxIndex + tile);
                 byte u = (byte)(g << 4);
@@ -389,7 +358,7 @@ public static partial class WidescreenPatch
                 byte clutIdx = m.ReadU8(L.Clut + tile);
                 ushort clut = m.ReadU16(ClutIdsAddr + (uint)((L.ClutAlt ? 0x100 : 0) + clutIdx) * 2);
 
-                uint prim = buf + Sprite16Ofs + sp16 * 16;
+                uint prim = pool + sp16 * 16;
                 AddPrim(m, ot, L.Order + page, prim, 3);
                 m.WriteU32(prim + 4, cmd << 24 | 0x808080);
                 m.WriteU32(prim + 8, (uint)(ushort)y0 << 16 | (ushort)x0);

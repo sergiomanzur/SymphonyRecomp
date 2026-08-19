@@ -182,7 +182,7 @@
     },
     {
       "address": "0x801776CC",
-      "name": "func_801776CC",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

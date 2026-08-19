@@ -142,10 +142,10 @@ namespace RecompOne.SoTN.Android
         {
             if (!File.Exists(cuePath)) return "The .cue file could not be found.";
 
-            CueFs? fs = null;
+            DiscFs? fs = null;
             try
             {
-                fs = CueFs.Open(cuePath);
+                fs = DiscFs.Open(cuePath);
             }
             catch
             {

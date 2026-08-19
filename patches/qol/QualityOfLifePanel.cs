@@ -24,7 +24,7 @@ public sealed class QualityOfLifePanel : IPanel
         var m = RecompOne.Runtime.Runtime.Mem;
         if (m == null || !Cheats.InPlay())
         {
-            ImGui.TextDisabled(Localization.T("common.not_in_play"));
+            ImGui.TextWrapped(Localization.T("common.not_in_play"));
 
             IsOpen = open;
             ImGui.End();

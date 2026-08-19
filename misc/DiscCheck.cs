@@ -43,10 +43,10 @@ public static class DiscCheck
 
     static string? Validate(string path)
     {
-        CueFs? fs = null;
+        DiscFs? fs = null;
         try
         {
-            fs = CueFs.Open(path);
+            fs = DiscFs.Open(path);
         }
         catch
         {

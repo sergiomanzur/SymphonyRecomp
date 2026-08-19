@@ -560,6 +560,7 @@ public static partial class Randomizer
         RandomizeRelics = RecompOne.Runtime.Runtime.View.GetBool("Rando.RandomizeRelics", RandomizeRelics);
         RandomizeStartingGear = RecompOne.Runtime.Runtime.View.GetBool("Rando.RandomizeStartingGear", RandomizeStartingGear);
         RemoveDeathFromEntrance = RecompOne.Runtime.Runtime.View.GetBool("Rando.RemoveDeathFromEntrance", RemoveDeathFromEntrance);
+        SkipPrologue = RecompOne.Runtime.Runtime.View.GetBool("Rando.SkipPrologue", SkipPrologue);
     }
 
     static void SaveSeed()
@@ -570,10 +571,11 @@ public static partial class Randomizer
         RecompOne.Runtime.Runtime.View.SetBool("Rando.RandomizeRelics", RandomizeRelics);
         RecompOne.Runtime.Runtime.View.SetBool("Rando.RandomizeStartingGear", RandomizeStartingGear);
         RecompOne.Runtime.Runtime.View.SetBool("Rando.RemoveDeathFromEntrance", RemoveDeathFromEntrance);
+        RecompOne.Runtime.Runtime.View.SetBool("Rando.SkipPrologue", SkipPrologue);
         RecompOne.Runtime.Runtime.SaveView();
     }
 
-    public static void RandomizeSeed()
+    public static void RandomizeSeed(bool notify = true)
     {
         var m = RecompOne.Runtime.Runtime.Mem;
         var c = RecompOne.Runtime.Runtime.Cpu;
@@ -618,6 +620,8 @@ public static partial class Randomizer
         QualityOfLife.BugFixes = true;
 
         SaveLoadManager.MarkApplied(SaveStamp.FromRandomizer());
+
+        if (notify) RecompOne.Runtime.Host.Window.ToastNotifications.Show("rando.toast.applied_title", "rando.toast.applied", SaveLoadManager.RandomIcon);
     }
 
     public static void DoRandomizeDrops()

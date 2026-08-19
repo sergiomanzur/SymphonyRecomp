@@ -122,7 +122,7 @@
     },
     {
       "address": "0x80195144",
-      "name": "func_80195144",
+      "name": "Random",
       "size": 48
     },
     {
@@ -232,7 +232,7 @@
     },
     {
       "address": "0x8019855C",
-      "name": "func_8019855C",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

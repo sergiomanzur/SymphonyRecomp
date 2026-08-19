@@ -1,159 +1,125 @@
 using RecompOne.Runtime.Context;
-using RecompOne.Runtime.Dispatch;
 using RecompOne.Runtime.Memory;
 
 namespace Recompiled;
 
-//have to recalculate spawning and processing of entities otherwise THE FUCKING TRANSITION DOOR DISAPEARS
-//its 1 am im so tired
+//spawning reimplementation. indstead of old hacky way, doing the proper reimplementation, so no more popping ;3
 public static partial class WidescreenPatch
 {
     const uint ScrollDeltaX = 0x80097908; //from dec ref
-
-    const int SpawnSlackLeft = 64;
-    const int SpawnSlackRight = 320;
+    const uint ScrollDeltaY = 0x8009790C;
 
     const uint StageEntities = 0x800762D8;
     const int EntitySize = 0xBC;
     const int EntityIdOffset = 0x26;
 
     const int LayoutPosX = 0;
+    const int LayoutPosY = 2;
     const int LayoutEntityId = 4;
     const int LayoutRoomIndex = 6;
 
-    const int RangeSlackClose = 0x40;
-    const int RangeSlackFar = 0x140;
-    const uint StageOverlayHeader = 0x80180000; //stage can be stale overlay (not fully overwriten so the recomp still marks it as loaded so head it via the header isntead
+    const int SpawnSlackLeft = 0x40;
+    const int SpawnSlackRight = 0x140;
+    const int SpawnSlackDown = 0x40;
+    const int SpawnSlackUp = 0x120;
 
-    //fn calls
-    static Action<CpuContext, IMemory>? _createRight;
-    static Action<CpuContext, IMemory>? _createLeft;
-    static Action<CpuContext, IMemory>? _fromLayout;
-    static uint _spawnUpdate;
+    static bool _dedupActive;
+    static int _dedupLo, _dedupHi;
 
-    static int SpawnExtra() => Math.Max(0, StageMargin() - SpawnSlackLeft);
+    static int ScrollX(IMemory m) => (short)m.ReadU16(TilemapScrollXHi);
+    static int ScrollY(IMemory m) => (short)m.ReadU16(TmScrollYHi);
 
-    static bool NameIs(string emitted, string name)
+    static void SpawnFromLayout(CpuContext c, IMemory m, uint obj, int posX)
     {
-        if (emitted.StartsWith(name, StringComparison.Ordinal)) return true;
-        int us = emitted.IndexOf('_');
-        return us > 0 && string.CompareOrdinal(emitted, us + 1, name, 0, name.Length) == 0;
-    }
+        if (_dedupActive && posX >= _dedupLo && posX <= _dedupHi) return;
 
-    static Action<CpuContext, IMemory>? Find(IOverlay overlay, string name) //should integrate on wraper?
-    {
-        foreach (var (_, fn) in overlay.Functions)
-            if (NameIs(fn.Method.Name, name)) return fn;
-        return null;
-    }
+        ushort entityId = m.ReadU16(obj + LayoutEntityId);
+        int kind = entityId & 0xE000;
+        if (kind == 0x8000) return;
+        if (kind != 0x0000 && kind != 0xA000) return;
 
-    static void EnsureSpawnFns(IMemory m)
-    {
-        uint update = m.ReadU32(StageOverlayHeader);
-        if (update == _spawnUpdate) return;
+        uint entity = StageEntities + (uint)((m.ReadU16(obj + LayoutRoomIndex) & 0xFF) * EntitySize);
+        if (kind == 0x0000 && m.ReadU16(entity + EntityIdOffset) != 0) return;
 
-        _spawnUpdate = update;
-        _createRight = null;
-        _createLeft = null;
-        _fromLayout = null;
-
-        foreach (var ov in Dispatcher.ActiveNames)
-        {
-            if (!Dispatcher.Overlays.TryGetValue(ov, out var overlay)) continue;
-            if (!overlay.Functions.ContainsKey(update)) continue;
-
-            _createRight = Find(overlay, "CreateEntitiesToTheRight");
-            _createLeft = Find(overlay, "CreateEntitiesToTheLeft");
-            _fromLayout = Find(overlay, "CreateEntityFromLayout");
-            return;
-        }
-    }
-
-    static void Spawn(Action<CpuContext, IMemory>? fn, CpuContext c, IMemory m, int posX)
-    {
+        var fn = StageFn(m, "CreateEntityFromLayout");
         if (fn == null) return;
+
         var snap = c.Snapshot();
-        c.A0 = (uint)(short)posX;
+        c.A0 = entity;
+        c.A1 = obj;
         fn(c, m);
         c.Restore(snap);
     }
 
-
-    static int ScrollX(IMemory m) => (short)m.ReadU16(TilemapScrollXHi);
-
-    public static void PostInitRoomEntities(CpuContext c, IMemory m)
+    public static void CreateEntityWhenInHorizontalRange(CpuContext c, IMemory m)
     {
-        if (OriginalAspect) return;
-        int extra = SpawnExtra();
-        if (extra == 0) return;
-
-        EnsureSpawnFns(m);
-        int scroll = ScrollX(m);
-
-        int right = scroll + SpawnSlackRight + extra;
-
-        Spawn(_createRight, c, m, right);
-        Spawn(_createLeft, c, m, scroll - SpawnSlackLeft - extra);
-        Spawn(_createRight, c, m, right);
-    }
-
-
-    public static void PreCreateEntityWhenInHorizontalRange(CpuContext c, IMemory m)
-    {
-        if (OriginalAspect) return;
-        int extra = SpawnExtra();
-        if (extra == 0) return;
-
-        EnsureSpawnFns(m);
-
-
-        if (_fromLayout == null) return;
-
         uint obj = c.A0;
         int scroll = ScrollX(m);
 
-        int close = Math.Max(0, scroll - RangeSlackClose);
-        int far = scroll + RangeSlackFar;
-        int posX = (short)m.ReadU16(obj + LayoutPosX);
-        if (posX >= close && posX <= far) return;
+        short close = (short)(scroll - SpawnSlackLeft - Margin);
+        short far = (short)(scroll + SpawnSlackRight + Margin);
+        if (close < 0) close = 0;
 
-        int wideClose = Math.Max(0, scroll - RangeSlackClose - extra);
-        int wideFar = far + extra;
-        if (posX < wideClose || posX > wideFar) return;
+        short posX = (short)m.ReadU16(obj + LayoutPosX);
+        if (posX < close || posX > far) return;
 
-        ushort entityId = m.ReadU16(obj + LayoutEntityId);
-        int kind = entityId & 0xE000;
-        if (kind != 0x0000 && kind != 0xA000) return;
-
-        uint entity = StageEntities + (uint)((m.ReadU16(obj + LayoutRoomIndex) & 0xFF) * EntitySize);
-        if (kind == 0x0000 && m.ReadU16(entity + EntityIdOffset) != 0) {
-            return;
-        }
-        var snap = c.Snapshot();
-        c.A0 = entity;
-        c.A1 = obj;
-        _fromLayout(c, m);
-
-        c.Restore(snap);
-
-
+        SpawnFromLayout(c, m, obj, posX);
     }
 
-
-    public static void PostUpdateRoomPosition(CpuContext c, IMemory m)
+    public static void CreateEntityWhenInVerticalRange(CpuContext c, IMemory m)
     {
-        if (OriginalAspect) return;
-        int extra = SpawnExtra();
-        if (extra == 0) return;
-        EnsureSpawnFns(m);
+        uint obj = c.A0;
+        int scroll = ScrollY(m);
 
-        int delta = (int)m.ReadU32(ScrollDeltaX);
-        int scroll = ScrollX(m);
+        short close = (short)(scroll - SpawnSlackDown);
+        short far = (short)(scroll + SpawnSlackUp);
+        if (close < 0) close = 0;
 
-        if (delta > 0) Spawn(_createRight, c, m, scroll + SpawnSlackRight + extra);
-        else if (delta < 0) Spawn(_createLeft, c, m, scroll - SpawnSlackLeft - extra);
+        short posY = (short)m.ReadU16(obj + LayoutPosY);
+        if (posY < close || posY > far) return;
+
+        SpawnFromLayout(c, m, obj, (short)m.ReadU16(obj + LayoutPosX));
     }
 
+    public static void UpdateRoomPosition(CpuContext c, IMemory m)
+    {
+        int deltaX = (int)m.ReadU32(ScrollDeltaX);
+        if (deltaX != 0)
+        {
+            int scroll = ScrollX(m);
+            if (deltaX > 0)
+                CallStage(c, m, "CreateEntitiesToTheRight", (uint)(short)(scroll + SpawnSlackRight + Margin));
+            else
+                CallStage(c, m, "CreateEntitiesToTheLeft", (uint)(short)(scroll - SpawnSlackLeft - Margin));
+        }
 
+        int deltaY = (int)m.ReadU32(ScrollDeltaY);
+        if (deltaY != 0)
+        {
+            int scroll = ScrollY(m);
+            if (deltaY > 0)
+                CallStage(c, m, "CreateEntitiesAbove", (uint)(short)(scroll + 288));
+            else
+                CallStage(c, m, "CreateEntitiesBelow", (uint)(short)(scroll - 64));
+        }
+    }
+
+    public static void PostInitRoomEntities(CpuContext c, IMemory m)
+    {
+        if (!Extended) return;
+        if (!StageHas(m, "FindFirstEntityToTheLeft", "FindFirstEntityToTheRight", "CreateEntitiesToTheRight")) return;
+
+        int scroll = ScrollX(m);
+        int target = scroll - SpawnSlackLeft - Margin;
+        if (target < 0) target = 0;
+
+        CallStage(c, m, "FindFirstEntityToTheLeft", (uint)(short)target);
+        CallStage(c, m, "FindFirstEntityToTheRight", (uint)(short)target);
+
+        _dedupLo = Math.Max(0, scroll - SpawnSlackLeft);
+        _dedupHi = scroll + SpawnSlackRight;
+        _dedupActive = true;
+        CallStage(c, m, "CreateEntitiesToTheRight", (uint)(short)(scroll + SpawnSlackRight + Margin));
+        _dedupActive = false;
+    }
 }
-

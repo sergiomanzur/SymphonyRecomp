@@ -157,12 +157,12 @@
     },
     {
       "address": "0x801A9C9C",
-      "name": "func_801A9C9C",
+      "name": "Random",
       "size": 48
     },
     {
       "address": "0x801A9CCC",
-      "name": "func_801A9CCC",
+      "name": "Update",
       "size": 764
     },
     {
@@ -222,7 +222,7 @@
     },
     {
       "address": "0x801ABE80",
-      "name": "func_801ABE80",
+      "name": "FindFirstEntityBelow",
       "size": 88
     },
     {
@@ -257,7 +257,7 @@
     },
     {
       "address": "0x801AC404",
-      "name": "func_801AC404",
+      "name": "DestroyEntity",
       "size": 108
     },
     {

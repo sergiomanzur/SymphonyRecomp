@@ -51,12 +51,12 @@ public static class SaveLoadManager
         }
 
         stamp.ApplyToRandomizer();
-        Randomizer.RandomizeSeed();
+        Randomizer.RandomizeSeed(false);
 
         ToastNotifications.Show("rando.save.applied_title", "rando.save.applied", RandomIcon);
     }
 
-    static uint RandomIcon()
+    public static uint RandomIcon()
     {
         var names = TrackerIcons.Names();
         if (names.Length == 0) return 0;
