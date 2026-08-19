@@ -338,6 +338,7 @@ namespace RecompOne.SoTN.Android
                         .Item("Mods", $"{ModLoader.Mods.Count} installed", ShowModsMenu)
                         .Section("System")
                         .Item("Display", AspectLabelShort(), ShowDisplayMenu)
+                        .Item("Controllers", ControllerSummary(), ShowControllersMenu)
                         .Item("Controller layout", AndroidSettings.LayoutName(AndroidSettings.Pad), ShowPadLayoutMenu)
                         .Item("Touch controls", _touchVisible ? "Visible" : "Hidden", ShowTouchControlsMenu)
                         .Item("Game disc", DiscLabel(), ShowDiscMenu)
@@ -719,6 +720,75 @@ namespace RecompOne.SoTN.Android
         }
 
         // --- Controller layout -----------------------------------------------------------
+
+        private static string ControllerSummary()
+        {
+            try
+            {
+                var pads = HostWindow.ConnectedPadCount;
+                if (pads > 0) return pads == 1 ? "1 connected" : $"{pads} connected";
+                return HostWindow.DescribeJoysticks().Count > 0 ? "Detected, unusable" : "None detected";
+            }
+            catch { return "Unavailable"; }
+        }
+
+        /// <summary>
+        /// What the game can actually see of the attached pads.
+        ///
+        /// A controller that does nothing has more than one cause - the system never
+        /// enumerated it, or SDL enumerated it but has no button mapping for it and so
+        /// refuses to drive it - and from the player's side both look identical. This screen
+        /// separates them, which matters because there is no usable log to read off a phone.
+        /// </summary>
+        private void ShowControllersMenu()
+        {
+            var sheet = new MenuSheet(this, "Controllers", "What the game can see right now");
+
+            List<(int Index, string Name, bool IsGameController)> found;
+            try { found = HostWindow.DescribeJoysticks().ToList(); }
+            catch (Exception ex)
+            {
+                sheet.Section("Input system")
+                     .Item("Unavailable", ex.Message, () => { })
+                     .Back("Back", ShowMenuDialog)
+                     .Show();
+                return;
+            }
+
+            if (found.Count == 0)
+            {
+                sheet.Section("Attached")
+                     .Item("Nothing detected", "Android is not reporting a pad", () =>
+                        Toast.MakeText(this,
+                            "Wired pads: reseat the USB-C plug and allow any permission prompt. Some pads have a mode switch - the Android or X-input position is the one to use.",
+                            ToastLength.Long)?.Show());
+            }
+            else
+            {
+                sheet.Section("Attached");
+                foreach (var (index, name, isPad) in found)
+                {
+                    string state = isPad ? "Usable" : "No button mapping";
+                    string message = isPad
+                        ? $"{name} is mapped and can drive the game."
+                        : $"Android reports {name}, but SDL has no button mapping for it, so the game will not read it. Try the pad's other mode if it has a mode switch.";
+                    sheet.Item(name, state, () => Toast.MakeText(this, message, ToastLength.Long)?.Show());
+                }
+            }
+
+            sheet.Section("In use")
+               .Item("Player 1", HostWindow.IsPadConnected(0) ? "Pad connected" : "Touch controls", () => { })
+               .Item("Player 2", HostWindow.IsPadConnected(1) ? "Pad connected" : "None", () => { })
+               .Section("If a pad is not listed")
+               .Item("Scan again", "Re-checks without restarting", () =>
+               {
+                   try { HostWindow.RescanControllers(); } catch { }
+                   Toast.MakeText(this, "Scanned again", ToastLength.Short)?.Show();
+                   ShowControllersMenu();
+               })
+               .Back("Back", ShowMenuDialog)
+               .Show();
+        }
 
         private void ShowPadLayoutMenu()
         {
