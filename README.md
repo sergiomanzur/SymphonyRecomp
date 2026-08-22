@@ -40,7 +40,7 @@ never would — that's the point.
 
 **[Get the APK from the releases page →](https://github.com/sergiomanzur/SymphonyRecomp/releases/latest)**
 
-Current release: **Beta 0.10** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
+Current release: **Beta 0.10.1** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
 
 The APK holds **no game data**. You supply your own disc the first time you open it, and the
 app never asks again. If your device refuses the install, allow "install unknown apps" for

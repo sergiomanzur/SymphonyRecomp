@@ -8,8 +8,8 @@
     <ApplicationId>com.blacklabelhq.sotn</ApplicationId>
     <!-- ApplicationVersion is the integer versionCode Android compares on update, so it only
          ever goes up. ApplicationDisplayVersion is what players see. -->
-    <ApplicationVersion>11</ApplicationVersion>
-    <ApplicationDisplayVersion>0.10</ApplicationDisplayVersion>
+    <ApplicationVersion>12</ApplicationVersion>
+    <ApplicationDisplayVersion>0.10.1</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidGenerateAppBundle>false</AndroidGenerateAppBundle>
     <UseFlagsAttributeForFlags>true</UseFlagsAttributeForFlags>
