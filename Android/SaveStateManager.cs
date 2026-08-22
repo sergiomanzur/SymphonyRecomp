@@ -98,6 +98,13 @@ namespace RecompOne.SoTN.Android
             else
                 success = DoLoadState(baseDir, loadSlot, out err);
 
+            // A failure here only ever reached the player as a toast, which is gone by the time
+            // anyone thinks to describe what happened. Say it out loud so a bug report can be
+            // checked against the log.
+            Console.WriteLine($"[SaveState] {(saveSlot > 0 ? "save" : "load")} slot " +
+                              $"{(saveSlot > 0 ? saveSlot : loadSlot)} " +
+                              (success ? "ok" : $"failed: {err}"));
+
             cb?.Invoke(success, err, saveSlot > 0 ? saveSlot : loadSlot);
         }
 
@@ -120,7 +127,7 @@ namespace RecompOne.SoTN.Android
                 using var bw = new BinaryWriter(ms);
 
                 // Header magic and timestamp
-                bw.Write(Encoding.ASCII.GetBytes("SOTNSS03"));
+                bw.Write(Encoding.ASCII.GetBytes("SOTNSS04"));
                 bw.Write(DateTime.UtcNow.ToBinary());
 
                 // CPU Registers
@@ -183,6 +190,17 @@ namespace RecompOne.SoTN.Android
                 for (int i = 0; i < vram.Length; i++)
                     bw.Write(vram[i]);
 
+                // SPU state: 512 KB of sample RAM, the 24 voices and the mixer registers.
+                //
+                // Restoring main RAM brings back the sound driver's bookkeeping - which voice
+                // is playing which sample, at which SPU address - but the samples themselves
+                // live in the SPU, and the game only uploads those once, on entering an area.
+                // Leaving them out meant those addresses still resolved after a load, just to
+                // whatever the previous session had left there.
+                var spu = RecompOne.Runtime.Runtime.Spu;
+                bw.Write(spu != null);
+                spu?.SnapshotState().WriteTo(bw);
+
                 File.WriteAllBytes(file, ms.ToArray());
                 return true;
             }
@@ -221,7 +239,7 @@ namespace RecompOne.SoTN.Android
                 // Magic check
                 byte[] magic = br.ReadBytes(8);
                 string magicStr = Encoding.ASCII.GetString(magic);
-                if (magicStr != "SOTNSS01" && magicStr != "SOTNSS02" && magicStr != "SOTNSS03")
+                if (magicStr != "SOTNSS01" && magicStr != "SOTNSS02" && magicStr != "SOTNSS03" && magicStr != "SOTNSS04")
                 {
                     error = "Invalid savestate file format.";
                     return false;
@@ -238,7 +256,7 @@ namespace RecompOne.SoTN.Android
                 uint epc = br.ReadUInt32();
                 cpu.Restore((gpr, hi, lo, sr, cause, epc));
 
-                if (magicStr == "SOTNSS03")
+                if (magicStr == "SOTNSS03" || magicStr == "SOTNSS04")
                 {
                     int overlayCount = br.ReadInt32();
                     string[] overlays = new string[overlayCount];
@@ -252,7 +270,7 @@ namespace RecompOne.SoTN.Android
                 byte[] ramData = br.ReadBytes(ramLen);
                 Array.Copy(ramData, mem.RamBuffer, Math.Min(ramLen, mem.RamBuffer.Length));
 
-                if (magicStr == "SOTNSS02" || magicStr == "SOTNSS03")
+                if (magicStr == "SOTNSS02" || magicStr == "SOTNSS03" || magicStr == "SOTNSS04")
                 {
                     // Scratchpad Restore
                     int scratchLen = br.ReadInt32();
@@ -296,22 +314,32 @@ namespace RecompOne.SoTN.Android
                 GpuHle.NotifyDisplay(gpu.DisplayX, gpu.DisplayY, gpu.DisplayWidth, gpu.DisplayHeight);
                 GpuHle.Backend?.WriteVram(0, 0, 1024, 512, gpu.Vram);
 
-                // Deliberately do not touch the SPU or XA here.
+                // SPU restore.
                 //
-                // None of the SPU's state is part of the savestate: not the voice registers,
-                // not the 512KB sample RAM, not the master volume. Anything we disturb on load
-                // is therefore never restored by anything.
+                // This used to be a comment explaining why the SPU was deliberately left
+                // alone. It was left alone because none of its state was in the savestate, so
+                // anything the load path disturbed was never restored by anything - and two
+                // attempts to poke it into shape each traded one symptom for another.
+                // Spu.Reset() zeroed the master volume the game only writes during init, which
+                // left the session permanently silent. Keying every voice off preserved the
+                // volume but stopped the music, because the sound driver tracks which voices it
+                // has already started and will not re-key a sustained note.
                 //
-                // Spu.Reset() zeroes the master volume (_mainVolL/R, _mainCurL/R), SPUCNT and
-                // the CD volume; the mixer multiplies the final mix by _mainCurL/R and the game
-                // only writes those during init, so that left the game permanently silent.
-                // Keying every voice off instead kept the volumes but stopped the music: the
-                // sound driver tracks which voices it has already started, so it does not
-                // re-key a sustained note and the BGM never came back.
+                // Neither could have worked. The driver's bookkeeping lives in main RAM and is
+                // restored; the samples it refers to live in the SPU's own 512 KB and were not.
+                // After a load those addresses still resolved, just to whatever the previous
+                // session had uploaded - so loading into a boss room shortly after launching
+                // could play the game's opening narration, and the music never returned because
+                // the driver believed it had already keyed it.
                 //
-                // Leaving the SPU running lets the restored sequencer state keep driving the
-                // voices it already owns. The cost is that a note that was sounding at the
-                // moment of the load may ring briefly into the restored scene.
+                // The state is in the savestate now, so restore it and let the driver and the
+                // hardware agree again. States written before SOTNSS04 have no SPU section and
+                // still load with the old behaviour.
+                if (magicStr == "SOTNSS04" && br.ReadBoolean())
+                {
+                    var spuState = RecompOne.Runtime.Spu.StateSnapshot.ReadFrom(br);
+                    RecompOne.Runtime.Runtime.Spu?.RestoreState(spuState);
+                }
 
                 // NOTE: do NOT unwind the C# callstack here.
                 //
