@@ -127,7 +127,7 @@ namespace RecompOne.SoTN.Android
                 using var bw = new BinaryWriter(ms);
 
                 // Header magic and timestamp
-                bw.Write(Encoding.ASCII.GetBytes("SOTNSS04"));
+                bw.Write(Encoding.ASCII.GetBytes("SOTNSS05"));
                 bw.Write(DateTime.UtcNow.ToBinary());
 
                 // CPU Registers
@@ -201,6 +201,14 @@ namespace RecompOne.SoTN.Android
                 bw.Write(spu != null);
                 spu?.SnapshotState().WriteTo(bw);
 
+                // CD drive state, which on this disc is the music. Three quarters of the
+                // sectors are XA audio: the soundtrack is streamed, and the XA pump walks from
+                // the drive's own position, filtered by its own channel. Both are host state,
+                // so without this a load left the drive playing whatever the current session
+                // was playing - the main menu's theme carrying on over a restored room, until
+                // walking into the next room made the game re-issue the read and correct it.
+                RecompOne.Runtime.Sdk.LibCd.SnapshotState().WriteTo(bw);
+
                 File.WriteAllBytes(file, ms.ToArray());
                 return true;
             }
@@ -239,7 +247,8 @@ namespace RecompOne.SoTN.Android
                 // Magic check
                 byte[] magic = br.ReadBytes(8);
                 string magicStr = Encoding.ASCII.GetString(magic);
-                if (magicStr != "SOTNSS01" && magicStr != "SOTNSS02" && magicStr != "SOTNSS03" && magicStr != "SOTNSS04")
+                if (magicStr != "SOTNSS01" && magicStr != "SOTNSS02" && magicStr != "SOTNSS03"
+                    && magicStr != "SOTNSS04" && magicStr != "SOTNSS05")
                 {
                     error = "Invalid savestate file format.";
                     return false;
@@ -256,7 +265,7 @@ namespace RecompOne.SoTN.Android
                 uint epc = br.ReadUInt32();
                 cpu.Restore((gpr, hi, lo, sr, cause, epc));
 
-                if (magicStr == "SOTNSS03" || magicStr == "SOTNSS04")
+                if (magicStr == "SOTNSS03" || magicStr == "SOTNSS04" || magicStr == "SOTNSS05")
                 {
                     int overlayCount = br.ReadInt32();
                     string[] overlays = new string[overlayCount];
@@ -270,7 +279,8 @@ namespace RecompOne.SoTN.Android
                 byte[] ramData = br.ReadBytes(ramLen);
                 Array.Copy(ramData, mem.RamBuffer, Math.Min(ramLen, mem.RamBuffer.Length));
 
-                if (magicStr == "SOTNSS02" || magicStr == "SOTNSS03" || magicStr == "SOTNSS04")
+                if (magicStr == "SOTNSS02" || magicStr == "SOTNSS03" || magicStr == "SOTNSS04"
+                    || magicStr == "SOTNSS05")
                 {
                     // Scratchpad Restore
                     int scratchLen = br.ReadInt32();
@@ -335,11 +345,21 @@ namespace RecompOne.SoTN.Android
                 // The state is in the savestate now, so restore it and let the driver and the
                 // hardware agree again. States written before SOTNSS04 have no SPU section and
                 // still load with the old behaviour.
-                if (magicStr == "SOTNSS04" && br.ReadBoolean())
+                if (magicStr == "SOTNSS04" || magicStr == "SOTNSS05")
                 {
-                    var spuState = RecompOne.Runtime.Spu.StateSnapshot.ReadFrom(br);
-                    RecompOne.Runtime.Runtime.Spu?.RestoreState(spuState);
+                    if (br.ReadBoolean())
+                    {
+                        var spuState = RecompOne.Runtime.Spu.StateSnapshot.ReadFrom(br);
+                        RecompOne.Runtime.Runtime.Spu?.RestoreState(spuState);
+                    }
                 }
+
+                // The drive, and with it the streamed music. Restoring this also flushes the
+                // audio decoded from the old position, so the previous track does not play out
+                // over the restored one.
+                if (magicStr == "SOTNSS05")
+                    RecompOne.Runtime.Sdk.LibCd.RestoreState(
+                        RecompOne.Runtime.Sdk.LibCd.CdState.ReadFrom(br));
 
                 // NOTE: do NOT unwind the C# callstack here.
                 //
