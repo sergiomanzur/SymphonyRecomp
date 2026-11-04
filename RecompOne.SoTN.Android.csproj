@@ -16,8 +16,12 @@
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <RuntimeIdentifiers>android-arm64;android-x64</RuntimeIdentifiers>
-    <!-- Exclude desktop Program.cs and the RecompOne submodule folder -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Program.cs;jdk/**</DefaultItemExcludes>
+    <!-- Exclude desktop Program.cs and the RecompOne submodule folder.
+         extras/** holds mod source, which is compiled at runtime by Roslyn and must never be
+         compiled into the app: the default **/*.cs glob would otherwise pull it in, where
+         Sotn.Button collides with Android.Widget.Button and the mod's types would end up in
+         both the app assembly and the runtime-built mod assembly. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Program.cs;jdk/**;extras/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -63,5 +67,12 @@
     <!-- Ship the bundled mods. The submodule git metadata would otherwise be packaged too. -->
     <AndroidAsset Include="mods\**\*"
                   Exclude="mods\.git\**;mods\**\.git\**;mods\**\.git;mods\.gitignore;mods\.gitmodules;mods\.cache\**" />
+
+    <!-- Mods this repository owns, kept out of the mods/ submodule (which belongs to
+         BlackLabelHQ). Linked into the mods/ asset path so CopyAssets("mods") unpacks them
+         next to the submodule's own, exactly as if they had shipped together. -->
+    <AndroidAsset Include="extras\mods\**\*" Exclude="extras\mods\**\.cache\**">
+      <Link>mods\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </AndroidAsset>
   </ItemGroup>
 </Project>

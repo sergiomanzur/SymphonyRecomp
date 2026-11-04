@@ -78,13 +78,18 @@ namespace RecompOne.SoTN.Android
             CopyAssets("Android");
             CopyAssets("mods"); // bundled mods, unpacked next to any the player adds
 
-            // Entry.Run calls ModLoader.LoadAll() with no argument, so point the loader at the
-            // folder chosen in the menu before the game starts.
-            try { ModLoader.RootOverride = ModsDir; } catch { }
-
+            // Load the config BEFORE reading ModsDir. ModsDir resolves through
+            // ConfigManager.View, so doing this the other way round read an empty View every
+            // time and silently fell back to app storage - which meant the "Mods folder"
+            // setting never actually took effect, however many times it was chosen.
+            //
             // The disc is no longer packaged in the APK, so there may be nothing to boot yet.
             // OnRun gates on it; all that is needed here is the config it gets recorded in.
             try { ConfigManager.Load(); } catch { }
+
+            // Entry.Run calls ModLoader.LoadAll() with no argument, so point the loader at the
+            // folder chosen in the menu before the game starts.
+            try { ModLoader.RootOverride = ModsDir; } catch { }
         }
 
         protected override void OnPostCreate(Bundle? savedInstanceState)
@@ -513,7 +518,16 @@ namespace RecompOne.SoTN.Android
                     {
                         ModLoader.SetEnabled(m.Info.Id, on);
                         Toast.MakeText(this, $"{name} {(on ? "enabled" : "disabled")}", ToastLength.Short)?.Show();
+                        // Reopen so a newly enabled mod's Settings row appears (and a disabled
+                        // one's disappears) instead of waiting for the next visit.
+                        ShowModsMenu();
                     });
+
+                    // A mod's own settings. DrawSettings() is ImGui and cannot be drawn here, so
+                    // only mods that describe their options through IModOptions are configurable
+                    // on Android - see ModOptions.cs.
+                    if (m.Loaded && m.HasOptions)
+                        sheet.Item("      Settings", "Configure", () => ShowModOptionsMenu(m));
                 }
                 sheet.Section("Library")
                      .Item("Mods folder", FriendlyModsDir(modsDir), ShowModsFolderMenu)
@@ -530,6 +544,140 @@ namespace RecompOne.SoTN.Android
             {
                 Toast.MakeText(this, $"Mods Manager error: {ex.Message}", ToastLength.Long)?.Show();
             }
+        }
+
+        // --- Mod settings ----------------------------------------------------------------
+        //
+        // Mods declare their options as data (ModOption) rather than drawing them, which is what
+        // makes them renderable here at all: the desktop path is raw ImGui, and this screen is
+        // native Android views. Both read the same list.
+
+        private void ShowModOptionsMenu(ModEntry mod)
+        {
+            try
+            {
+                string name = string.IsNullOrWhiteSpace(mod.Info.Name) ? mod.Info.Id : mod.Info.Name;
+                var options = mod.Options();
+
+                if (options.Count == 0)
+                {
+                    new MenuSheet(this, name, "No options")
+                        .Section("Nothing to configure")
+                        .Back("Back", ShowModsMenu)
+                        .Show();
+                    return;
+                }
+
+                var sheet = new MenuSheet(this, name, $"v{mod.Info.Version}");
+                string? section = null;
+
+                foreach (var option in options)
+                {
+                    var o = option;
+
+                    if (o.Section != section)
+                    {
+                        section = o.Section;
+                        if (!string.IsNullOrEmpty(section)) sheet.Section(section);
+                    }
+
+                    if (!SafeAvailable(o))
+                    {
+                        // Greyed out on desktop; here it becomes a row that says why nothing happens.
+                        sheet.Item(o.Label, "Unavailable", () =>
+                            Toast.MakeText(this, $"{o.Label} does not apply right now", ToastLength.Short)?.Show());
+                        continue;
+                    }
+
+                    switch (o.Kind)
+                    {
+                        case ModOptionKind.Toggle:
+                            sheet.Toggle(o.Label, o.GetBool?.Invoke() ?? false, v =>
+                            {
+                                try { o.SetBool?.Invoke(v); }
+                                catch (Exception ex) { Toast.MakeText(this, ex.Message, ToastLength.Long)?.Show(); }
+                            });
+                            break;
+
+                        case ModOptionKind.Choice:
+                            sheet.Item(o.Label, o.ValueText(), () => ShowModChoiceMenu(mod, o));
+                            break;
+
+                        case ModOptionKind.Slider:
+                            sheet.Item(o.Label, o.ValueText(), () => ShowModSliderMenu(mod, o));
+                            break;
+
+                        case ModOptionKind.Action:
+                            sheet.Item(o.Label, null, () =>
+                            {
+                                try { o.Invoke?.Invoke(); Toast.MakeText(this, o.Label, ToastLength.Short)?.Show(); }
+                                catch (Exception ex) { Toast.MakeText(this, ex.Message, ToastLength.Long)?.Show(); }
+                                ShowModOptionsMenu(mod);
+                            });
+                            break;
+                    }
+                }
+
+                sheet.Back("Back", ShowModsMenu).Show();
+            }
+            catch (Exception ex)
+            {
+                Toast.MakeText(this, $"Mod settings error: {ex.Message}", ToastLength.Long)?.Show();
+            }
+        }
+
+        private void ShowModChoiceMenu(ModEntry mod, ModOption option)
+        {
+            int current = 0;
+            try { current = option.GetIndex?.Invoke() ?? 0; } catch { }
+
+            var sheet = new MenuSheet(this, option.Label, option.Description);
+            for (int i = 0; i < option.Choices.Length; i++)
+            {
+                int index = i;
+                sheet.Item(option.Choices[i], index == current ? "Selected" : null, () =>
+                {
+                    try { option.SetIndex?.Invoke(index); }
+                    catch (Exception ex) { Toast.MakeText(this, ex.Message, ToastLength.Long)?.Show(); }
+                    ShowModOptionsMenu(mod);
+                });
+            }
+            sheet.Back("Back", () => ShowModOptionsMenu(mod)).Show();
+        }
+
+        // No slider widget in MenuSheet, and a thumb-sized one would be fiddly anyway, so the
+        // range is offered as discrete steps.
+        private void ShowModSliderMenu(ModEntry mod, ModOption option)
+        {
+            float current = 0f;
+            try { current = option.GetFloat?.Invoke() ?? 0f; } catch { }
+
+            float step = option.Step > 0f ? option.Step : 1f;
+            var sheet = new MenuSheet(this, option.Label, option.Description);
+
+            int steps = (int)Math.Round((option.Max - option.Min) / step);
+            if (steps < 1) steps = 1;
+            if (steps > 40) steps = 40;              // keep the sheet scrollable, not endless
+            step = (option.Max - option.Min) / steps;
+
+            for (int i = 0; i <= steps; i++)
+            {
+                float value = option.Min + step * i;
+                bool selected = Math.Abs(value - current) < step / 2f;
+                sheet.Item(option.FormatValue(value), selected ? "Selected" : null, () =>
+                {
+                    try { option.SetFloat?.Invoke(value); }
+                    catch (Exception ex) { Toast.MakeText(this, ex.Message, ToastLength.Long)?.Show(); }
+                    ShowModOptionsMenu(mod);
+                });
+            }
+            sheet.Back("Back", () => ShowModOptionsMenu(mod)).Show();
+        }
+
+        private static bool SafeAvailable(ModOption option)
+        {
+            try { return option.Available; }
+            catch { return true; }
         }
 
         private void ShowCheatsMenu()

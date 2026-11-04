@@ -9,7 +9,10 @@
     <NoWarn>0162</NoWarn>
     <!-- Android/** is the net10.0-android head (RecompOne.SoTN.Android.csproj); it references
          the Android SDK bindings and must not be compiled into the desktop build. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Android/**;jdk/**</DefaultItemExcludes>
+    <!-- extras/** holds mod source, compiled at runtime by Roslyn. It must not be compiled into
+         the executable too, or the mod's types would exist in both this assembly and the
+         runtime-built mod assembly. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Android/**;jdk/**;extras/**</DefaultItemExcludes>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
@@ -28,5 +31,16 @@
     <EmbeddedResource Include="assets/extension/*.png" />
     <EmbeddedResource Include="assets/icon/*.ico" />
     <EmbeddedResource Include="assets/languages.json" />
+  </ItemGroup>
+
+  <!-- Mods this repository owns. They live in extras/mods rather than in mods/, which is the
+       BlackLabelHQ SymphonyRecompMods submodule - a folder added there would be untracked in
+       someone else's repository. Copied into the output as mods/ so ModLoader finds them next
+       to the executable, alongside anything the player drops in themselves. -->
+  <ItemGroup>
+    <None Include="extras/mods/**/*" Exclude="extras/mods/**/.cache/**">
+      <Link>mods/%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

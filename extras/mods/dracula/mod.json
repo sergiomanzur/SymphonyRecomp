@@ -1,0 +1,9 @@
+{
+    "id": "dracula",
+    "name": "Playable Dracula",
+    "firstPartyMod": false,
+    "version": "1.0",
+    "author": "sergiomanzur",
+    "description": "Play the castle as its master.\n\nDracula trades Alucard's agility for reach and weight: a three-way Hellfire fan, a charged Dark Inferno, a shattering teleport instead of a dodge, a rain of meteors, and a bat swarm to reposition.\n\nPick your character under Settings. Switching is instant and never writes to your save.",
+    "dependencies": []
+}
