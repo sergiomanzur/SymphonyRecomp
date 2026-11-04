@@ -71,7 +71,7 @@ public class PlayableDracula : IMod, IModOptions
                 "character", "Character",
                 new[] { "Alucard", "Dracula" },
                 () => (int)Settings.Playing,
-                i => { Settings.Playing = (Playable)i; OnCharacterChanged(); },
+                i => { Settings.Playing = (Playable)i; Settings.Save(); OnCharacterChanged(); },
                 description: "Switching is instant and works on any save. Nothing here is ever written to your save file.",
                 section: "Who you play"),
 

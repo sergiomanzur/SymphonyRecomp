@@ -48,38 +48,36 @@ public static class Settings
 
     public static void Load()
     {
-        var v = RecompOne.Runtime.Runtime.View;
-        Playing = (Playable)v.GetInt(Prefix + "character", (int)Playable.Alucard);
-        Input.Mod = (Modifier)v.GetInt(Prefix + "modifier", (int)Modifier.Circle);
-        HellfireVolley = v.GetBool(Prefix + "hellfireVolley", true);
-        DarkInferno = v.GetBool(Prefix + "darkInferno", true);
-        DemonicTeleport = v.GetBool(Prefix + "demonicTeleport", true);
-        MeteorRain = v.GetBool(Prefix + "meteorRain", true);
-        BatSwarm = v.GetBool(Prefix + "batSwarm", true);
-        Recolour = v.GetBool(Prefix + "recolour", true);
-        MpRegen = v.GetBool(Prefix + "mpRegen", true);
-        DamageResistance = v.GetBool(Prefix + "damageResistance", true);
-        StrongerAttacks = v.GetBool(Prefix + "strongerAttacks", true);
-        HeavyMovement = v.GetBool(Prefix + "heavyMovement", false);
-        MpCostScale = v.GetFloat(Prefix + "mpCostScale", 1.0f);
+        Playing = (Playable)RecompOne.Runtime.Config.Settings.Get(Prefix + "character", (int)Playable.Alucard);
+        Input.Mod = (Modifier)RecompOne.Runtime.Config.Settings.Get(Prefix + "modifier", (int)Modifier.Circle);
+        HellfireVolley = RecompOne.Runtime.Config.Settings.Get(Prefix + "hellfireVolley", true);
+        DarkInferno = RecompOne.Runtime.Config.Settings.Get(Prefix + "darkInferno", true);
+        DemonicTeleport = RecompOne.Runtime.Config.Settings.Get(Prefix + "demonicTeleport", true);
+        MeteorRain = RecompOne.Runtime.Config.Settings.Get(Prefix + "meteorRain", true);
+        BatSwarm = RecompOne.Runtime.Config.Settings.Get(Prefix + "batSwarm", true);
+        Recolour = RecompOne.Runtime.Config.Settings.Get(Prefix + "recolour", true);
+        MpRegen = RecompOne.Runtime.Config.Settings.Get(Prefix + "mpRegen", true);
+        DamageResistance = RecompOne.Runtime.Config.Settings.Get(Prefix + "damageResistance", true);
+        StrongerAttacks = RecompOne.Runtime.Config.Settings.Get(Prefix + "strongerAttacks", true);
+        HeavyMovement = RecompOne.Runtime.Config.Settings.Get(Prefix + "heavyMovement", false);
+        MpCostScale = RecompOne.Runtime.Config.Settings.Get(Prefix + "mpCostScale", 1.0f);
     }
 
     public static void Save()
     {
-        var v = RecompOne.Runtime.Runtime.View;
-        v.SetInt(Prefix + "character", (int)Playing);
-        v.SetInt(Prefix + "modifier", (int)Input.Mod);
-        v.SetBool(Prefix + "hellfireVolley", HellfireVolley);
-        v.SetBool(Prefix + "darkInferno", DarkInferno);
-        v.SetBool(Prefix + "demonicTeleport", DemonicTeleport);
-        v.SetBool(Prefix + "meteorRain", MeteorRain);
-        v.SetBool(Prefix + "batSwarm", BatSwarm);
-        v.SetBool(Prefix + "recolour", Recolour);
-        v.SetBool(Prefix + "mpRegen", MpRegen);
-        v.SetBool(Prefix + "damageResistance", DamageResistance);
-        v.SetBool(Prefix + "strongerAttacks", StrongerAttacks);
-        v.SetBool(Prefix + "heavyMovement", HeavyMovement);
-        v.SetFloat(Prefix + "mpCostScale", MpCostScale);
-        RecompOne.Runtime.Runtime.SaveView();
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "character", (int)Playing);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "modifier", (int)Input.Mod);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "hellfireVolley", HellfireVolley);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "darkInferno", DarkInferno);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "demonicTeleport", DemonicTeleport);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "meteorRain", MeteorRain);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "batSwarm", BatSwarm);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "recolour", Recolour);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "mpRegen", MpRegen);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "damageResistance", DamageResistance);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "strongerAttacks", StrongerAttacks);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "heavyMovement", HeavyMovement);
+        RecompOne.Runtime.Config.Settings.Set(Prefix + "mpCostScale", MpCostScale);
+        RecompOne.Runtime.Config.Settings.Save();
     }
 }
