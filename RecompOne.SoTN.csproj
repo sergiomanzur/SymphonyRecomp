@@ -12,7 +12,7 @@
     <!-- extras/** holds mod source, compiled at runtime by Roslyn. It must not be compiled into
          the executable too, or the mod's types would exist in both this assembly and the
          runtime-built mod assembly. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Android/**;jdk/**;extras/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Android/**;jdk/**;extras/**;mods/**</DefaultItemExcludes>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">

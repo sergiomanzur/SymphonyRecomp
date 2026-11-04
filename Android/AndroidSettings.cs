@@ -17,63 +17,86 @@ namespace RecompOne.SoTN.Android
     }
 
     /// <summary>
-    /// Everything the Android menu can change, stored in the shared view config so it
+    /// Everything the Android menu can change, stored in the shared runtime settings so it
     /// survives a restart. Previously these lived only in fields on the activity and were
     /// lost every launch.
     /// </summary>
     public static class AndroidSettings
     {
-        const string KeyTouchVisible = "AndroidTouchVisible";
-        const string KeyTouchOpacity = "AndroidTouchOpacity";
-        const string KeyOrientation = "AndroidOrientation";
-        const string KeyAspect = "AndroidAspect";
-        const string KeyPadLayout = "AndroidPadLayout";
-        public const string KeyModsPath = "AndroidModsPath";
+        // The upstream 1.1 runtime replaced the old ViewConfig/ConfigManager pair with
+        // Options, which persist to settings.json. Keys keep their android.* namespace so
+        // they cannot collide with a desktop setting.
+        static readonly Option<bool> TouchVisibleOption =
+            Options.Bool("android.touch.visible", DefaultTouchVisible);
+
+        static readonly Option<float> TouchOpacityOption =
+            Options.Float("android.touch.opacity", DefaultTouchOpacity)
+                .Normalized(static v => Math.Clamp(v, 0.1f, 1f));
+
+        static readonly Option<int> OrientationOption =
+            Options.Int("android.orientation", 0)
+                .Normalized(static v => Math.Clamp(v, 0, 2));
+
+        static readonly Option<int> AspectOption =
+            Options.Int("android.aspect", (int)HostWindow.AspectRatioMode.AutoDevice)
+                .Normalized(static v => Math.Clamp(v, 0, 3));
+
+        static readonly Option<int> PadLayoutOption =
+            Options.Int("android.pad_layout", 0)
+                .Normalized(static v => Math.Clamp(v, 0, 2));
+
+        static readonly Option<int> TouchControlModeOption =
+            Options.Int("android.touch.control_mode", 0)
+                .Normalized(static v => Math.Clamp(v, 0, 1));
+
+        static readonly Option<string> ModsPathOption =
+            Options.String("android.mods_path", "");
+
+        public const string KeyModsPath = "android.mods_path";
 
         public const bool DefaultTouchVisible = true;
         public const float DefaultTouchOpacity = 0.7f;
 
-        static ViewConfig V => ConfigManager.View;
-
         public static bool TouchVisible
         {
-            get => V.GetBool(KeyTouchVisible, DefaultTouchVisible);
-            set { V.SetBool(KeyTouchVisible, value); Save(); }
+            get => TouchVisibleOption.Value;
+            set { TouchVisibleOption.Value = value; Save(); }
         }
 
         public static float TouchOpacity
         {
-            get
-            {
-                string s = V.GetString(KeyTouchOpacity);
-                return float.TryParse(s, System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out float f) && f > 0f
-                    ? Math.Clamp(f, 0.1f, 1f)
-                    : DefaultTouchOpacity;
-            }
-            set
-            {
-                V.SetString(KeyTouchOpacity, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                Save();
-            }
+            get => TouchOpacityOption.Value;
+            set { TouchOpacityOption.Value = value; Save(); }
+        }
+
+        public static int TouchControlMode
+        {
+            get => TouchControlModeOption.Value;
+            set { TouchControlModeOption.Value = value; Save(); }
+        }
+
+        public static string ModsPath
+        {
+            get => ModsPathOption.Value ?? "";
+            set { ModsPathOption.Value = value ?? ""; Save(); }
         }
 
         public static MainActivity.ScreenOrientationMode Orientation
         {
-            get => (MainActivity.ScreenOrientationMode)Clamp(V.GetInt(KeyOrientation, 0), 0, 2);
-            set { V.SetInt(KeyOrientation, (int)value); Save(); }
+            get => (MainActivity.ScreenOrientationMode)OrientationOption.Value;
+            set { OrientationOption.Value = (int)value; Save(); }
         }
 
         public static HostWindow.AspectRatioMode Aspect
         {
-            get => (HostWindow.AspectRatioMode)Clamp(V.GetInt(KeyAspect, (int)HostWindow.AspectRatioMode.AutoDevice), 0, 3);
-            set { V.SetInt(KeyAspect, (int)value); Save(); }
+            get => (HostWindow.AspectRatioMode)AspectOption.Value;
+            set { AspectOption.Value = (int)value; Save(); }
         }
 
         public static PadLayout Pad
         {
-            get => (PadLayout)Clamp(V.GetInt(KeyPadLayout, 0), 0, 2);
-            set { V.SetInt(KeyPadLayout, (int)value); Save(); ApplyPadLayout(value); }
+            get => (PadLayout)PadLayoutOption.Value;
+            set { PadLayoutOption.Value = (int)value; Save(); ApplyPadLayout(value); }
         }
 
         /// <summary>
@@ -117,18 +140,14 @@ namespace RecompOne.SoTN.Android
                 // 256x240 stage with square pixels, which is narrower than 4:3 and would have
                 // quietly changed how "4:3 original" looks. Widening then only adds level to
                 // the sides instead of reshaping the sprites.
-                Recompiled.WidescreenPatch.Unstretch = false;
-                V.SetBool("WidescreenUnstretch", false);
+                Recompiled.WidescreenOptions.Unstretch.Value = false;
 
-                Recompiled.WidescreenPatch.OriginalAspect = original;
-                V.SetBool("WidescreenOriginalAspect", original);
+                Recompiled.WidescreenOptions.OriginalAspect.Value = original;
 
                 if (!original)
                 {
                     // Written before Refresh: the patch reads these on its first initialisation.
-                    V.SetFloat("WidescreenAspect", target);
-                    RecompOne.Runtime.Hle.Display.TargetAspect = target;
-                    Recompiled.WidescreenPatch.StageAspect = target;
+                    Recompiled.WidescreenOptions.Aspect.Value = target;
                 }
 
                 Recompiled.WidescreenPatch.Refresh();
@@ -140,11 +159,9 @@ namespace RecompOne.SoTN.Android
             }
         }
 
-        static int Clamp(int v, int lo, int hi) => v < lo ? lo : v > hi ? hi : v;
-
         static void Save()
         {
-            try { ConfigManager.SaveView(null); } catch { }
+            try { Settings.Save(); } catch { }
         }
 
         /// <summary>
@@ -160,23 +177,26 @@ namespace RecompOne.SoTN.Android
         {
             try
             {
-                var pad = ConfigManager.Game.Pad;
-                switch (layout)
+                var port = Settings.System.Input[0];
+                foreach (var pad in new[] { port.Digital, port.Analog })
                 {
-                    case PadLayout.Nintendo:
-                        pad.Cross = [1];
-                        pad.Circle = [0];
-                        pad.Square = [3];
-                        pad.Triangle = [2];
-                        break;
-                    default: // PlayStation and Xbox share the same physical arrangement
-                        pad.Cross = [0];
-                        pad.Circle = [1];
-                        pad.Square = [2];
-                        pad.Triangle = [3];
-                        break;
+                    switch (layout)
+                    {
+                        case PadLayout.Nintendo:
+                            pad.Cross = [1];
+                            pad.Circle = [0];
+                            pad.Square = [3];
+                            pad.Triangle = [2];
+                            break;
+                        default: // PlayStation and Xbox share the same physical arrangement
+                            pad.Cross = [0];
+                            pad.Circle = [1];
+                            pad.Square = [2];
+                            pad.Triangle = [3];
+                            break;
+                    }
                 }
-                ConfigManager.SaveGame();
+                Settings.Save();
             }
             catch
             {
@@ -206,28 +226,20 @@ namespace RecompOne.SoTN.Android
         /// <summary>Puts every Android menu setting back to its default.</summary>
         public static void ResetAll()
         {
-            V.SetBool(KeyTouchVisible, DefaultTouchVisible);
-            V.SetString(KeyTouchOpacity, DefaultTouchOpacity.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            V.SetInt(KeyOrientation, 0);
-            V.SetInt(KeyAspect, (int)HostWindow.AspectRatioMode.AutoDevice);
-            V.SetInt(KeyPadLayout, 0);
-            V.SetString(KeyModsPath, "");
-            V.TouchControlMode = 0;
-            V.RenderScale = 4;
-            V.VSync = false;
+            TouchVisibleOption.Reset();
+            TouchOpacityOption.Reset();
+            OrientationOption.Reset();
+            AspectOption.Reset();
+            PadLayoutOption.Reset();
+            TouchControlModeOption.Reset();
+            ModsPathOption.Reset();
+
+            DisplayOptions.RenderScale.Value = 4;
+            DisplayOptions.VSync.Value = false;
 
             // The quality of life toggles live in the same file, so a reset should clear
             // those too rather than leaving half the settings behind.
-            Recompiled.QualityOfLife.ColorBlind = false;
-            Recompiled.QualityOfLife.RemoveFlashing = false;
-            Recompiled.QualityOfLife.BugFixes = false;
-            Recompiled.QualityOfLife.ClearFile = false;
-            Recompiled.QualityOfLife.AntiFreeze = false;
-            Recompiled.QualityOfLife.InfiniteWingSmash = false;
-            Recompiled.QualityOfLife.UseEasySpellInput = false;
-            Recompiled.QualityOfLife.IncreaseInvincibilityFrames = false;
-            Recompiled.QualityOfLife.RestoreFairySong = false;
-            try { Recompiled.QualityOfLife.Save(); } catch { }
+            foreach (var option in Recompiled.QualityOfLifeOptions.All) option.Reset();
 
             ApplyPadLayout(PadLayout.PlayStation);
             ApplyAspect(HostWindow.AspectRatioMode.AutoDevice);

@@ -78,14 +78,18 @@ namespace RecompOne.SoTN.Android
             CopyAssets("Android");
             CopyAssets("mods"); // bundled mods, unpacked next to any the player adds
 
-            // Load the config BEFORE reading ModsDir. ModsDir resolves through
-            // ConfigManager.View, so doing this the other way round read an empty View every
-            // time and silently fell back to app storage - which meant the "Mods folder"
-            // setting never actually took effect, however many times it was chosen.
+            // The translation system keeps user packs here, and upstream creates it on
+            // startup. The Android app has its own working directory, so make it too.
+            try { Directory.CreateDirectory("translations"); } catch { }
+
+            // Load the settings BEFORE reading ModsDir. ModsDir resolves through the Android
+            // settings, so doing this the other way round read an empty value every time and
+            // silently fell back to app storage - which meant the "Mods folder" setting never
+            // actually took effect, however many times it was chosen.
             //
             // The disc is no longer packaged in the APK, so there may be nothing to boot yet.
             // OnRun gates on it; all that is needed here is the config it gets recorded in.
-            try { ConfigManager.Load(); } catch { }
+            try { Settings.EnsureLoaded(); } catch { }
 
             // Entry.Run calls ModLoader.LoadAll() with no argument, so point the loader at the
             // folder chosen in the menu before the game starts.
@@ -128,8 +132,13 @@ namespace RecompOne.SoTN.Android
                 // QualityOfLife.Load() to RuntimeReadyEvent. Program.cs is excluded from the
                 // Android build, so without this the saved toggles were never read back and
                 // every launch started with all of them off.
-                try { QualityOfLife.Load(); }
+                try { QualityOfLifeMenu.Register(); }
                 catch (Exception ex) { Console.Error.WriteLine($"[Android] QoL settings failed to load: {ex.Message}"); }
+
+                // Program.cs installs the disc validator; it is what tells a Japanese or
+                // European dump apart from an unusable file.
+                try { DiscCheck.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Disc check registration failed: {ex.Message}"); }
 
                 // Program.cs does this on desktop. The widescreen hooks are already compiled into
                 // generated/ and are being called, but without this listener nothing ever sets
@@ -140,8 +149,14 @@ namespace RecompOne.SoTN.Android
                 // Also from Program.cs, and part of the same widescreen story: widening the
                 // Prologue exposes empty space to the left of the throne, and this listener
                 // draws the artwork that fills it. Without it that strip is just black.
-                try { ThroneLeftFill.Register(); }
-                catch (Exception ex) { Console.Error.WriteLine($"[Android] Throne fill registration failed: {ex.Message}"); }
+                try { RoomFills.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Room fill registration failed: {ex.Message}"); }
+
+                // Program.cs also registers the new asset replacement and translation systems.
+                try { TextureSourcesPatch.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Texture sources registration failed: {ex.Message}"); }
+                try { Recompiled.Translation.GameLanguage.Register(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Android] Translation registration failed: {ex.Message}"); }
 
                 // Aspect ratio and pad layout are plain statics in the runtime, so restore the
                 // saved choices before the game starts. Orientation is applied in OnPostCreate,
@@ -149,7 +164,7 @@ namespace RecompOne.SoTN.Android
                 try { AndroidSettings.ApplyAtStartup(); }
                 catch (Exception ex) { Console.Error.WriteLine($"[Android] settings failed to apply: {ex.Message}"); }
 
-                var cdPath = ConfigManager.Game.CdPath;
+                var cdPath = Settings.System.DiscPath;
                 Console.WriteLine($"[Android] Launching Entry.Run with CdPath = '{cdPath}'");
 
                 // Run the game!
@@ -224,7 +239,7 @@ namespace RecompOne.SoTN.Android
                     {
                         TouchOpacity = _touchOpacity,
                         TouchVisible = _touchVisible,
-                        ControlMode = (TouchControlMode)ConfigManager.View.TouchControlMode,
+                        ControlMode = (TouchControlMode)AndroidSettings.TouchControlMode,
                         OnMenuClicked = ShowMenuDialog,
                         // Keep the settings dialog's label in step with the on-screen toggle.
                         OnVisibilityToggled = visible => _touchVisible = visible
@@ -363,7 +378,7 @@ namespace RecompOne.SoTN.Android
         {
             try
             {
-                string p = ConfigManager.Game.CdPath ?? "";
+                string p = Settings.System.DiscPath ?? "";
                 return p.Length > 0 ? System.IO.Path.GetFileNameWithoutExtension(p) : "Not set";
             }
             catch { return "Not set"; }
@@ -372,7 +387,7 @@ namespace RecompOne.SoTN.Android
         private void ShowDiscMenu()
         {
             string path = "";
-            try { path = ConfigManager.Game.CdPath ?? ""; } catch { }
+            try { path = Settings.System.DiscPath ?? ""; } catch { }
 
             new MenuSheet(this, "Game disc",
                           path.Length > 0 ? System.IO.Path.GetFileName(path) : "No disc loaded")
@@ -403,8 +418,8 @@ namespace RecompOne.SoTN.Android
 
                     try
                     {
-                        ConfigManager.Game.CdPath = "";
-                        ConfigManager.SaveGame();
+                        Settings.System.DiscPath = "";
+                        Settings.Save();
                     }
                     catch (Exception ex) { Console.Error.WriteLine($"[Android] Could not clear the disc path: {ex.Message}"); }
 
@@ -731,12 +746,12 @@ namespace RecompOne.SoTN.Android
                 .Item("Orientation", orientStr, ShowOrientationSubmenu)
                 .Item("Aspect ratio", aspectStr, ShowAspectRatioSubmenu)
                 .Section("Rendering")
-                .Item("Render scale", RenderScaleLabel(ConfigManager.View.RenderScale), ShowRenderScaleSubmenu)
-                .Toggle("VSync", ConfigManager.View.VSync, on =>
+                .Item("Render scale", RenderScaleLabel(DisplayOptions.RenderScale.Value), ShowRenderScaleSubmenu)
+                .Toggle("VSync", DisplayOptions.VSync.Value, on =>
                 {
-                    ConfigManager.View.VSync = on;
+                    DisplayOptions.VSync.Value = on;
                     HostWindow.SetVSync(on);
-                    ConfigManager.SaveView(null);
+                    Settings.Save();
                 })
                 .Back("Back", ShowMenuDialog)
                 .Show();
@@ -755,14 +770,14 @@ namespace RecompOne.SoTN.Android
         {
             void Pick(int scale)
             {
-                ConfigManager.View.RenderScale = scale;
-                ConfigManager.SaveView(null);
+                DisplayOptions.RenderScale.Value = scale;
+                Settings.Save();
                 HostWindow.RequestGpuReset();
                 Toast.MakeText(this, $"Rendering at {RenderScaleLabel(scale)}", ToastLength.Short)?.Show();
                 ShowDisplayMenu();
             }
 
-            int cur = ConfigManager.View.RenderScale;
+            int cur = DisplayOptions.RenderScale.Value;
             var sheet = new MenuSheet(this, "Render scale", "Higher looks sharper and costs more battery");
             foreach (int scale in new[] { 1, 2, 3, 4 })
             {
@@ -825,7 +840,7 @@ namespace RecompOne.SoTN.Android
 
         private void ShowTouchControlsMenu()
         {
-            int mode = ConfigManager.View.TouchControlMode;
+            int mode = AndroidSettings.TouchControlMode;
 
             void SetOpacity(float v, string label)
             {
@@ -840,8 +855,8 @@ namespace RecompOne.SoTN.Android
                 .Item("Style", mode == 0 ? "D-pad" : "Analog stick", () =>
                 {
                     int next = mode == 0 ? 1 : 0;
-                    ConfigManager.View.TouchControlMode = next;
-                    try { ConfigManager.SaveView(); } catch { }
+                    AndroidSettings.TouchControlMode = next;
+                    try { Settings.Save(); } catch { }
                     if (_touchView != null)
                     {
                         _touchView.ControlMode = (TouchControlMode)next;
@@ -998,8 +1013,6 @@ namespace RecompOne.SoTN.Android
 
         // --- Mods folder -----------------------------------------------------------------
 
-        private const string ModsPathKey = "AndroidModsPath";
-
         /// <summary>
         /// Where mods are loaded from. Defaults to the copy unpacked from the APK, but can be
         /// pointed anywhere the app can read so mods can be added without rebuilding.
@@ -1010,7 +1023,7 @@ namespace RecompOne.SoTN.Android
             {
                 try
                 {
-                    string chosen = ConfigManager.View.GetString(ModsPathKey);
+                    string chosen = AndroidSettings.ModsPath;
                     if (!string.IsNullOrWhiteSpace(chosen) && Directory.Exists(chosen)) return chosen;
                 }
                 catch { }
@@ -1052,8 +1065,8 @@ namespace RecompOne.SoTN.Android
                     try
                     {
                         Directory.CreateDirectory(c.Path);
-                        ConfigManager.View.SetString(ModsPathKey, c.Path);
-                        ConfigManager.SaveView(null);
+                        AndroidSettings.ModsPath = c.Path;
+                        Settings.Save();
                         Toast.MakeText(this, $"Mods folder set to {c.Label}. Restart to load from it.", ToastLength.Long)?.Show();
                     }
                     catch (Exception ex)
@@ -1075,36 +1088,32 @@ namespace RecompOne.SoTN.Android
 
         private static string QolSummary()
         {
-            int on = 0;
-            if (QualityOfLife.ColorBlind) on++;
-            if (QualityOfLife.RemoveFlashing) on++;
-            if (QualityOfLife.BugFixes) on++;
-            if (QualityOfLife.ClearFile) on++;
-            if (QualityOfLife.AntiFreeze) on++;
-            if (QualityOfLife.InfiniteWingSmash) on++;
-            if (QualityOfLife.UseEasySpellInput) on++;
-            if (QualityOfLife.IncreaseInvincibilityFrames) on++;
-            if (QualityOfLife.RestoreFairySong) on++;
+            int on = QualityOfLifeOptions.All.Count(o => o.Value);
             return on == 0 ? "All off" : $"{on} on";
         }
 
         private void ShowQualityOfLifeMenu()
         {
-            void Save() { try { QualityOfLife.Save(); } catch { } }
+            void Set(RecompOne.Runtime.Config.Option<bool> option, bool value)
+            {
+                option.Value = value;
+                try { Settings.Save(); } catch { }
+            }
 
             new MenuSheet(this, "Quality of life", "Saved between sessions")
                 .Section("Accessibility")
-                .Toggle("Colour blind fixes", QualityOfLife.ColorBlind, v => { QualityOfLife.ColorBlind = v; Save(); })
-                .Toggle("Remove screen flashes", QualityOfLife.RemoveFlashing, v => { QualityOfLife.RemoveFlashing = v; Save(); })
-                .Toggle("No screen freeze", QualityOfLife.AntiFreeze, v => { QualityOfLife.AntiFreeze = v; Save(); })
+                .Toggle("Colour blind fixes", QualityOfLifeOptions.ColorBlind.Value, v => Set(QualityOfLifeOptions.ColorBlind, v))
+                .Toggle("Remove screen flashes", QualityOfLifeOptions.RemoveFlashing.Value, v => Set(QualityOfLifeOptions.RemoveFlashing, v))
+                .Toggle("No screen freeze", QualityOfLifeOptions.AntiFreeze.Value, v => Set(QualityOfLifeOptions.AntiFreeze, v))
                 .Section("Play")
-                .Toggle("Bug fixes", QualityOfLife.BugFixes, v => { QualityOfLife.BugFixes = v; Save(); })
-                .Toggle("Easy spell inputs", QualityOfLife.UseEasySpellInput, v => { QualityOfLife.UseEasySpellInput = v; Save(); })
-                .Toggle("Infinite wing smash", QualityOfLife.InfiniteWingSmash, v => { QualityOfLife.InfiniteWingSmash = v; Save(); })
-                .Toggle("More invincibility frames", QualityOfLife.IncreaseInvincibilityFrames, v => { QualityOfLife.IncreaseInvincibilityFrames = v; Save(); })
-                .Toggle("Clear file", QualityOfLife.ClearFile, v => { QualityOfLife.ClearFile = v; Save(); })
+                .Toggle("Bug fixes", QualityOfLifeOptions.BugFixes.Value, v => Set(QualityOfLifeOptions.BugFixes, v))
+                .Toggle("Easy spell inputs", QualityOfLifeOptions.UseEasySpellInput.Value, v => Set(QualityOfLifeOptions.UseEasySpellInput, v))
+                .Toggle("Infinite wing smash", QualityOfLifeOptions.InfiniteWingSmash.Value, v => Set(QualityOfLifeOptions.InfiniteWingSmash, v))
+                .Toggle("More invincibility frames", QualityOfLifeOptions.IncreaseInvincibilityFrames.Value, v => Set(QualityOfLifeOptions.IncreaseInvincibilityFrames, v))
+                .Toggle("Clear file", QualityOfLifeOptions.ClearFile.Value, v => Set(QualityOfLifeOptions.ClearFile, v))
+                .Toggle("Skip prologue", QualityOfLifeOptions.SkipPrologue.Value, v => Set(QualityOfLifeOptions.SkipPrologue, v))
                 .Section("Enhancements")
-                .Toggle("Restore Sprite's Nocturne song", QualityOfLife.RestoreFairySong, v => { QualityOfLife.RestoreFairySong = v; Save(); })
+                .Toggle("Restore Sprite's Nocturne song", QualityOfLifeOptions.RestoreFairySong.Value, v => Set(QualityOfLifeOptions.RestoreFairySong, v))
                 .Back("Back", ShowMenuDialog)
                 .Show();
         }
@@ -1409,14 +1418,14 @@ namespace RecompOne.SoTN.Android
         {
             try
             {
-                ConfigManager.Load();
+                Settings.EnsureLoaded();
 
-                if (DiscImporter.LooksComplete(ConfigManager.Game.CdPath ?? "")) return true;
+                if (DiscImporter.LooksComplete(Settings.System.DiscPath ?? "")) return true;
 
                 if (DiscImporter.FindExisting(this) is { } found)
                 {
-                    ConfigManager.Game.CdPath = found;
-                    ConfigManager.SaveGame();
+                    Settings.System.DiscPath = found;
+                    Settings.Save();
                     Console.WriteLine($"[Android] Using disc: {found}");
                     return true;
                 }
@@ -1694,8 +1703,8 @@ namespace RecompOne.SoTN.Android
                     {
                         try
                         {
-                            ConfigManager.Game.CdPath = result.CuePath;
-                            ConfigManager.SaveGame();
+                            Settings.System.DiscPath = result.CuePath;
+                            Settings.Save();
                         }
                         catch (Exception ex)
                         {
@@ -1751,7 +1760,7 @@ namespace RecompOne.SoTN.Android
         private string CardPath(int index)
         {
             string p = "";
-            try { p = index == 0 ? ConfigManager.Game.CardAPath : ConfigManager.Game.CardBPath; }
+            try { p = index == 0 ? Settings.System.CardA.Path : Settings.System.CardB.Path; }
             catch { }
             if (string.IsNullOrWhiteSpace(p)) p = index == 0 ? "carda.sav" : "cardb.sav";
             return System.IO.Path.IsPathRooted(p) ? p : System.IO.Path.Combine(FilesDir?.Path ?? "", p);

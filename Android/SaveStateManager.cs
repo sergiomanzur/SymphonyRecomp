@@ -132,12 +132,12 @@ namespace RecompOne.SoTN.Android
 
                 // CPU Registers
                 var snapshot = cpu.Snapshot();
-                for (int i = 0; i < 32; i++) bw.Write(snapshot.gpr[i]);
-                bw.Write(snapshot.hi);
-                bw.Write(snapshot.lo);
-                bw.Write(snapshot.sr);
-                bw.Write(snapshot.cause);
-                bw.Write(snapshot.epc);
+                for (int i = 0; i < 32; i++) bw.Write(snapshot[i]);
+                bw.Write(snapshot.HI);
+                bw.Write(snapshot.LO);
+                bw.Write(snapshot.SR);
+                bw.Write(snapshot.Cause);
+                bw.Write(snapshot.EPC);
 
                 // Active Overlays
                 var activeOverlays = Dispatcher.ActiveNames;
@@ -263,7 +263,17 @@ namespace RecompOne.SoTN.Android
                 uint sr = br.ReadUInt32();
                 uint cause = br.ReadUInt32();
                 uint epc = br.ReadUInt32();
-                cpu.Restore((gpr, hi, lo, sr, cause, epc));
+
+                var restored = new RecompOne.Runtime.Context.CpuSnapshot
+                {
+                    HI = hi,
+                    LO = lo,
+                    SR = sr,
+                    Cause = cause,
+                    EPC = epc,
+                };
+                for (int i = 1; i < 32; i++) restored[i] = gpr[i];
+                cpu.Restore(restored);
 
                 if (magicStr == "SOTNSS03" || magicStr == "SOTNSS04" || magicStr == "SOTNSS05")
                 {

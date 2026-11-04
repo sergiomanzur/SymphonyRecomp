@@ -21,7 +21,7 @@
          compiled into the app: the default **/*.cs glob would otherwise pull it in, where
          Sotn.Button collides with Android.Widget.Button and the mod's types would end up in
          both the app assembly and the runtime-built mod assembly. -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Program.cs;jdk/**;extras/**</DefaultItemExcludes>
+    <DefaultItemExcludes>$(DefaultItemExcludes);RecompOne/**;Program.cs;jdk/**;extras/**;mods/**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
