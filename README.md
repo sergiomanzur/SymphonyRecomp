@@ -40,7 +40,7 @@ never would — that's the point.
 
 **[Get the APK from the releases page →](https://github.com/sergiomanzur/SymphonyRecomp/releases/latest)**
 
-Current release: **Beta 0.10.1** — about 54 MB, Android 5.0 (API 21) or newer, arm64 or x64.
+Current release: **Beta 0.11** — about 60 MB, Android 5.0 (API 21) or newer, arm64 or x64.
 
 The APK holds **no game data**. You supply your own disc the first time you open it, and the
 app never asks again. If your device refuses the install, allow "install unknown apps" for
@@ -89,10 +89,12 @@ just the layout a standard dump arrives in.
 - **Save states** — five slots.
 - **Memory cards** — export a save to share or back up, import one from the desktop build or
   an emulator. Raw `.mcr`/`.mcd`/`.sav` plus DexDrive and VGS files.
-- **True widescreen** — 16:9 and fit-to-screen render more of the level rather than
-  stretching a 4:3 picture sideways.
-- **Quality of life** — colour blind fixes, remove screen flashes, bug fixes, easy spell
-  inputs, extra invincibility frames and more, all carried over from the desktop build.
+- **True widescreen** - 16:9 and fit-to-screen render more of the level rather than
+  stretching a 4:3 picture sideways, with the upstream room fills so the extra space is
+  furnished instead of empty.
+- **Quality of life** - colour blind fixes, remove screen flashes, bug fixes, easy spell
+  inputs, extra invincibility frames, skip prologue and more, all carried over from the
+  desktop build.
 - **Cheats, stats and inventory** — heal, level, gold, attributes, and a full item, relic
   and spell editor.
 - **Mods** — compiled on device, so source mods work the same as they do on desktop.
@@ -180,9 +182,9 @@ Once you're in, the **⚙ MENU** button in the top corner opens everything.
 
 ## Known limitations
 
-- **Save states are best used within one session**, and work most reliably when you save
-  and load at similar moments. The emulated sound chip isn't captured in a state, so one
-  loaded in a different area can play the wrong samples until the game reloads them.
+- **Save states include the sound chip and the disc drive position now**, so music and
+  samples survive a load. States written by older versions still load, but they carry no
+  audio state - re-save anything you care about. States are best used within one session.
 - **Importing copies the disc**, so you need roughly 600 MB free on top of the app itself.
   The originals can be deleted afterwards.
 - Desktop-only features — the map tracker, the randomizer panel — aren't in the Android
