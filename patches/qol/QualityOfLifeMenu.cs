@@ -8,9 +8,10 @@ public static class QualityOfLifeMenu
     public static void Register()
     {
         Event.AddListener<RuntimeReadyEvent>(_ => QualityOfLife.Load());
+        foreach (var option in QualityOfLifeOptions.All)
+            option.Changed += _ => QualityOfLife.Load();
         PanelManager.Register(new QualityOfLifePanel());
 
-        MenuRegistry.Menu("menu.misc", MenuRegistry.OrderGame)
-            .Panel<QualityOfLifePanel>("panel.qol").Order(10);
+        MenuRegistry.Menu("menu.misc").After("menu.mods").Panel<QualityOfLifePanel>("panel.qol");
     }
 }

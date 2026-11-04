@@ -9,8 +9,8 @@ public static class TrackerMenu
         PanelManager.Register(new TrackerOverlayPanel());
         PanelManager.Register(new MapOverlayPanel());
 
-        MenuRegistry.Menu("menu.misc", MenuRegistry.OrderGame)
-            .Submenu("menu.misc.overlays").Order(30)
+        MenuRegistry.Menu("menu.misc")
+            .Submenu("menu.misc.overlays").After("menu.misc.cheats")
                 .Panel<TrackerOverlayPanel>("panel.tracker")
                 .Panel<MapOverlayPanel>("panel.map")
                 .End();

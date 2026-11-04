@@ -57,7 +57,7 @@ public static class HelpMenu
     {
         PopupManager.Register(new AboutPopup());
 
-        MenuRegistry.Menu("menu.help", MenuRegistry.OrderHelp)
+        MenuRegistry.Menu("menu.help").After("menu.updates")
             .Popup<AboutPopup>("menu.help.about");
     }
 }

@@ -59,7 +59,7 @@ public static partial class WidescreenPatch
         var snap = c.Snapshot();
         c.A0 = (uint)x;
         c.A1 = (uint)y;
-        SoTN.SetNextRoomToLoad(c, m);
+        SoTN_dra.SetNextRoomToLoad(c, m);
         int v0 = (int)c.V0;
         c.Restore(snap);
         return v0;
@@ -106,7 +106,7 @@ public static partial class WidescreenPatch
             if (S32(m, DrawModeFlag) == 2)
             {
                 ret = NextRoom(c, m, left + (posXv >> 8), top + (S16(m, PlPosYHi) >> 8));
-                m.WriteU32(RoomLoadDef + 4, (uint)(posXv & 0xFF));
+                m.WriteU32(RoomLoadDef + 4, (uint)((px - S16(m, TilemapScrollXHi)) & 0xFF));
                 m.WriteU32(RoomLoadDef + 8, (uint)(S16(m, PlPosYHi) & 0xFF));
                 c.V0 = (uint)ret;
                 return;
@@ -119,9 +119,7 @@ public static partial class WidescreenPatch
                     ret = NextRoom(c, m, left - 1, top + (py >> 8));
                     if (ret != 0)
                     {
-                        W16(m, TilemapScrollXHi, vScroll);
-                        W16(m, PlPosXHi, posXv);
-                        m.WriteU32(RoomLoadDef + 4, (uint)(posXv + 256));
+                        m.WriteU32(RoomLoadDef + 4, (uint)(px - S16(m, TilemapScrollXHi) + 256));
                         m.WriteU32(RoomLoadDef + 8, (uint)(int)S16(m, PlPosYHi));
                         m.WriteU16(PlayerUnk78, 1);
                         c.V0 = (uint)ret;
@@ -137,9 +135,7 @@ public static partial class WidescreenPatch
                     ret = NextRoom(c, m, S32(m, TmRight) + 1, top + (py >> 8));
                     if (ret != 0)
                     {
-                        W16(m, TilemapScrollXHi, vScroll);
-                        W16(m, PlPosXHi, posXv);
-                        m.WriteU32(RoomLoadDef + 4, (uint)(posXv - 256));
+                        m.WriteU32(RoomLoadDef + 4, (uint)(px - S16(m, TilemapScrollXHi) - 256));
                         m.WriteU32(RoomLoadDef + 8, (uint)(int)S16(m, PlPosYHi));
                         m.WriteU16(PlayerUnk78, 1);
                         c.V0 = (uint)ret;
@@ -152,11 +148,6 @@ public static partial class WidescreenPatch
             }
             else skipToCamera = true;
         }
-
-        vScroll = px < tmX + anchor ? tmX
-            : tmW + anchor - 256 < px ? tmW - 256
-            : px - anchor;
-        posXv = px - vScroll;
 
         if (!skipToCamera && S32(m, GfxUnk24) == 0)
         {
@@ -221,7 +212,7 @@ public static partial class WidescreenPatch
         }
         bool locked = _roomX != int.MinValue && (tmX != _roomX || tmW != _roomW);
 
-        int margin = arg0 == 0 || CamPanActive(m) || locked ? 0 : StageMargin();
+        int margin = CamPanActive(m) || locked ? 0 : StageMargin();
         if (margin > 0) margin = Math.Min(margin, Math.Max(0, ((tmW - tmX) - 256) / 2));
 
         int scroll = margin > 0

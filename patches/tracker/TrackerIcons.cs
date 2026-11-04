@@ -3,8 +3,6 @@ using System.Reflection;
 using System.Text;
 using ImGuiNET;
 using RecompOne.Runtime.Host;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Recompiled;
 
@@ -35,10 +33,8 @@ public static class TrackerIcons
 
         try
         {
-            using var img = Image.Load<Rgba32>(bytes);
-            var rgba = new byte[img.Width * img.Height * 4];
-            img.CopyPixelDataTo(rgba);
-            return Store(key, rgba, img.Width, img.Height, out color, out gray);
+            var img = RgbaImage.Load(bytes);
+            return Store(key, img.Pixels, img.Width, img.Height, out color, out gray);
         }
         catch
         {

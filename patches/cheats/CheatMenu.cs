@@ -10,8 +10,8 @@ public static class CheatMenu
         PanelManager.Register(new StatsCheatPanel());
         PanelManager.Register(new InventoryCheatPanel());
 
-        MenuRegistry.Menu("menu.misc", MenuRegistry.OrderGame)
-            .Submenu("menu.misc.cheats").Order(20)
+        MenuRegistry.Menu("menu.misc")
+            .Submenu("menu.misc.cheats").After("panel.qol")
                 .Panel<MovementCheatPanel>("panel.cheats.movement")
                 .Panel<StatsCheatPanel>("panel.cheats.stats")
                 .Panel<InventoryCheatPanel>("panel.cheats.inventory")

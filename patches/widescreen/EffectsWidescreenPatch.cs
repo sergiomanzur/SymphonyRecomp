@@ -10,20 +10,80 @@ public static partial class WidescreenPatch
 {
     const int FlashW = 256;
     const int FlashH = 240;
+    const int TeleportW = 0xC0;
+    const int SpyglassFirstStep = 3;
+    const int SpyglassLastStep = 6;
 
-    public static void RegisterEffectPrims() => Event.AddListener<RenderPrimEvent>(WidenScreenFlash);
+    static bool _spyglass;
+
+    public static void RegisterEffectPrims()
+    {
+        Event.AddListener<RenderPrimEvent>(WidenScreenFlash);
+        Event.AddListener<RenderPrimEvent>(WidenSpyglass);
+        Event.AddListener<TilemapRenderedEvent>(TrackSpyglass);
+        Event.AddListener<TilemapRenderedEvent>(ExtendStageBackgrounds);
+        Event.AddListener<TilemapRenderedEvent>(ExtendStageDestruction);
+        Event.AddListener<TilemapRenderedEvent>(FixCornerText);
+    }
 
     static void WidenScreenFlash(RenderPrimEvent e)
     {
         if (OriginalAspect || !DisplayModeHooks.IsStage) return;
         if (e.Textured || e.Gouraud || e.Count != 2) return;
-        if (e.X[1] - e.X[0] != FlashW || e.Y[1] - e.Y[0] != FlashH) return;
+        if (e.Y[1] - e.Y[0] != FlashH) return;
 
         int margin = StageMargin();
         if (margin <= 0) return;
 
-        e.X[0] -= margin;
-        e.X[1] += margin;
+        int width = e.X[1] - e.X[0];
+        int left = e.X[0] - e.DrawLeft;
+        if (width == FlashW)
+        {
+            e.X[0] -= margin;
+            e.X[1] += margin;
+        }
+        else if (width == TeleportW && left == 0)
+            e.X[0] -= margin;
+        else if (width == TeleportW && left == TeleportW)
+            e.X[1] = Math.Max(e.X[1], e.DrawLeft + FlashW + margin);
+    }
+
+    static void TrackSpyglass(TilemapRenderedEvent e)
+    {
+        _spyglass = false;
+        if (OriginalAspect || !DisplayModeHooks.IsStage) return;
+        var m = e.Memory;
+        if (!string.Equals(StageOverlay(m)?.Name, "no1", StringComparison.OrdinalIgnoreCase)) return;
+        uint fn = StageSym(m, "func_us_801BA290").Addr;
+        if (fn == 0) return;
+        for (int i = StageEntityStart; i < TotalEntityCount; i++)
+        {
+            uint entity = PedAt(i);
+            if (m.ReadU32(entity + EntPfnUpdate) != fn) continue;
+            _spyglass = m.ReadU16(entity + EntStep) is >= SpyglassFirstStep and <= SpyglassLastStep;
+            return;
+        }
+    }
+
+    static void WidenSpyglass(RenderPrimEvent e)
+    {
+        if (!_spyglass || e.Textured || OriginalAspect || !DisplayModeHooks.IsStage) return;
+        int margin = StageMargin();
+        if (margin <= 0) return;
+
+        int min = int.MaxValue, max = int.MinValue;
+        for (int i = 0; i < e.Count; i++)
+        {
+            min = Math.Min(min, e.X[i]);
+            max = Math.Max(max, e.X[i]);
+        }
+
+        int left = min - e.DrawLeft, right = max - e.DrawLeft;
+        for (int i = 0; i < e.Count; i++)
+        {
+            if (left <= 0 && e.X[i] == min) e.X[i] -= margin;
+            if (right >= FlashW - 1 && e.X[i] == max) e.X[i] += margin;
+        }
     }
 
 //todo: this can probably be shortned
@@ -52,7 +112,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0x5D4u;
         c.RA = 0x801BAB58u;
-        SoTN.InitializeEntity_st0(c, m);
+        SoTN_st0.InitializeEntity_st0(c, m);
         c.A0 = 0u | 0x0004u;
         c.V0 = 0x80040000u;
         c.V0 = m.ReadU32((c.V0 - 0x3820u));
@@ -235,19 +295,19 @@ public static partial class WidescreenPatch
         m.WriteU8((c.At + 0x207u), (byte)c.V0);
         c.A0 = 0u | 0x0100u;
         c.RA = 0x801BAE00u;
-        SoTN.SetGeomScreen(c, m);
+        SoTN_main.SetGeomScreen(c, m);
         c.A0 = 0u | 0x0080u;
         c.A1 = 0u | 0x00A0u;
         c.RA = 0x801BAE0Cu;
-        SoTN.SetGeomOffset(c, m);
+        SoTN_main.SetGeomOffset(c, m);
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0x217Cu;
         c.A1 = c.S3 + 0u;
         c.RA = 0x801BAE1Cu;
-        SoTN.RotMatrix(c, m);
+        SoTN_main.RotMatrix(c, m);
         c.A0 = c.S3 + 0u;
         c.RA = 0x801BAE24u;
-        SoTN.SetRotMatrix(c, m);
+        SoTN_main.SetRotMatrix(c, m);
         c.S4 = 0x80180000u;
         c.S4 = c.S4 + 0x216Cu;
         c.V0 = 0x80040000u;
@@ -560,7 +620,7 @@ public static partial class WidescreenPatch
         L801BB270: ;
         c.A0 = c.S2 + 0u;
         c.RA = 0x801BB278u;
-        SoTN.DestroyEntity_st0(c, m);
+        SoTN_st0.DestroyEntity_st0(c, m);
         L801BB278: ;
         c.RA = m.ReadU32((c.SP + 0x3Cu));
         c.FP = m.ReadU32((c.SP + 0x38u));
@@ -622,7 +682,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0x5D4u;
         c.RA = 0x801BE238u;
-        SoTN.InitializeEntity_st0(c, m);
+        SoTN_st0.InitializeEntity_st0(c, m);
         c.A0 = 0u | 0x0004u;
         c.V0 = 0u | 0x0080u;
         m.WriteU16((c.S3 + 0x2u), (ushort)c.V0);
@@ -684,7 +744,7 @@ public static partial class WidescreenPatch
         c.A0 = m.ReadU32((c.SP + 0xD0u));
         c.FP = 0u + 0u;
         c.RA = 0x801BE304u;
-        SoTN.SquareRoot0(c, m);
+        SoTN_main.SquareRoot0(c, m);
         c.V0 = c.V0 << 2;
         c.T3 = m.ReadU16((c.SP + 0xC8u));
         c.S1 = c.S5 << 3;
@@ -694,13 +754,13 @@ public static partial class WidescreenPatch
         L801BE31C: ;
         c.A0 = c.S2 + 0u;
         c.RA = 0x801BE324u;
-        SoTN.rcos(c, m);
+        SoTN_main.rcos(c, m);
         { var _r = (long)(int)c.S7 * (int)c.V0; c.LO = (uint)_r; c.HI = (uint)(_r >> 32); }
         c.A0 = c.S2 + 0u;
         c.S0 = c.LO;
         c.S0 = (uint)((int)c.S0 >> 12);
         c.RA = 0x801BE338u;
-        SoTN.rsin(c, m);
+        SoTN_main.rsin(c, m);
         { var _r = (long)(int)c.S7 * (int)c.V0; c.LO = (uint)_r; c.HI = (uint)(_r >> 32); }
         c.S5 = c.S5 + 0x1u;
         c.T3 = m.ReadU32((c.SP + 0xC0u));
@@ -842,7 +902,7 @@ public static partial class WidescreenPatch
         c.A0 = c.A2 + 0u;
         c.A1 = c.SP + 0x48u;
         c.RA = 0x801BE518u;
-        SoTN.SetDrawEnv(c, m);
+        SoTN_main.SetDrawEnv(c, m);
         c.V0 = 0u | 0x0002u;
         m.WriteU16((c.S0 + 0x26u), (ushort)c.V0);
         c.V0 = 0u | 0x1000u;
@@ -860,7 +920,7 @@ public static partial class WidescreenPatch
         L801BE544: ;
         c.A0 = c.S3 + 0u;
         c.RA = 0x801BE54Cu;
-        SoTN.DestroyEntity_st0(c, m);
+        SoTN_st0.DestroyEntity_st0(c, m);
         goto L801BEAD0;
         L801BE554: ;
         m.WriteU16((c.S0 + 0x26u), (ushort)c.V0);
@@ -915,26 +975,26 @@ public static partial class WidescreenPatch
         c.V0 = c.V0 + 0x20u;
         m.WriteU16((c.S3 + 0xA8u), (ushort)c.V0);
         c.RA = 0x801BE608u;
-        SoTN.rsin(c, m);
+        SoTN_main.rsin(c, m);
         c.V0 = c.V0 << 6;
         c.V0 = (uint)((int)c.V0 >> 12);
         c.A0 = (uint)(short)m.ReadU16((c.S3 + 0xA6u));
         c.V0 = c.V0 + 0x5F0u;
         m.WriteU16((c.S3 + 0x9Cu), (ushort)c.V0);
         c.RA = 0x801BE620u;
-        SoTN.rsin(c, m);
+        SoTN_main.rsin(c, m);
         c.V0 = c.V0 << 7;
         c.V0 = (uint)((int)c.V0 >> 12);
         c.A0 = (uint)(short)m.ReadU16((c.S3 + 0xA8u));
         c.V0 = c.V0 + 0xB0u;
         m.WriteU16((c.S3 + 0x9Eu), (ushort)c.V0);
         c.RA = 0x801BE638u;
-        SoTN.rsin(c, m);
+        SoTN_main.rsin(c, m);
         c.A0 = (uint)(short)m.ReadU16((c.S3 + 0xAAu));
         c.V0 = c.V0 >> 8;
         m.WriteU16((c.S3 + 0xA0u), (ushort)c.V0);
         c.RA = 0x801BE648u;
-        SoTN.rsin(c, m);
+        SoTN_main.rsin(c, m);
         c.V1 = c.V0 << 1;
         c.V1 = c.V1 + c.V0;
         c.V1 = c.V1 << 3;
@@ -977,21 +1037,21 @@ public static partial class WidescreenPatch
         c.V0 = c.V0 - 0x4u;
         m.WriteU16((c.S3 + 0x80u), (ushort)c.V0);
         c.RA = 0x801BE6E4u;
-        SoTN.SetGeomScreen(c, m);
+        SoTN_main.SetGeomScreen(c, m);
         c.A0 = (uint)(short)m.ReadU16((c.S3 + 0x2u));
         c.A1 = (uint)(short)m.ReadU16((c.S3 + 0x6u));
         c.FP = 0u + 0u;
         c.RA = 0x801BE6F4u;
-        SoTN.SetGeomOffset(c, m);
+        SoTN_main.SetGeomOffset(c, m);
         c.A0 = 0u + 0u;
         c.A1 = 0u + 0u;
         c.A2 = 0u + 0u;
         c.RA = 0x801BE704u;
-        SoTN.SetFarColor(c, m);
+        SoTN_main.SetFarColor(c, m);
         c.A0 = 0u | 0x0128u;
         c.A1 = 0u | 0x00C0u;
         c.RA = 0x801BE710u;
-        SoTN.SetFogNear(c, m);
+        SoTN_main.SetFogNear(c, m);
         m.WriteU16((c.SP + 0x10u), (ushort)0u);
         m.WriteU16((c.SP + 0x12u), (ushort)0u);
         c.V1 = m.ReadU16((c.S3 + 0x80u));
@@ -1007,10 +1067,10 @@ public static partial class WidescreenPatch
         c.V1 = c.V1 + c.V0;
         m.WriteU16((c.SP + 0x14u), (ushort)c.V1);
         c.RA = 0x801BE750u;
-        SoTN.RotMatrix(c, m);
+        SoTN_main.RotMatrix(c, m);
         c.A0 = c.S0 + 0u;
         c.RA = 0x801BE758u;
-        SoTN.SetRotMatrix(c, m);
+        SoTN_main.SetRotMatrix(c, m);
         c.A0 = c.S0 + 0u;
         c.V0 = 0u | 0x00C0u;
         m.WriteU32((c.SP + 0x18u), 0u);
@@ -1021,10 +1081,10 @@ public static partial class WidescreenPatch
         c.V0 = c.V0 + 0xC0u;
         m.WriteU32((c.SP + 0x20u), c.V0);
         c.RA = 0x801BE780u;
-        SoTN.TransMatrix(c, m);
+        SoTN_main.TransMatrix(c, m);
         c.A0 = c.S0 + 0u;
         c.RA = 0x801BE788u;
-        SoTN.SetTransMatrix(c, m);
+        SoTN_main.SetTransMatrix(c, m);
         c.A2 = 0x1F800000u;
         c.A3 = 0u | 0x0004u;
         c.A0 = 0x1F800000u;
@@ -1332,7 +1392,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0x5D4u;
         c.RA = 0x801AB128u;
-        SoTN.InitializeEntity_st0(c, m);
+        SoTN_st0.InitializeEntity_st0(c, m);
         c.A0 = 0u | 0x0003u;
         c.V0 = 0x80040000u;
         c.V0 = m.ReadU32((c.V0 - 0x3848u));
@@ -1646,11 +1706,11 @@ public static partial class WidescreenPatch
         L801AB5B0: ;
         c.A0 = c.S0 + 0u;
         c.RA = 0x801AB5B8u;
-        SoTN.PreventEntityFromRespawning_st0(c, m);
+        SoTN_st0.PreventEntityFromRespawning_st0(c, m);
         L801AB5B8: ;
         c.A0 = c.S0 + 0u;
         c.RA = 0x801AB5C0u;
-        SoTN.DestroyEntity_st0(c, m);
+        SoTN_st0.DestroyEntity_st0(c, m);
         goto L801AB5D0;
         L801AB5C8: ;
         m.WriteU32((c.S0 + 0x80u), c.A0);
@@ -1694,7 +1754,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0xADCu;
         c.RA = 0x801B91F4u;
-        SoTN.InitializeEntity_no3(c, m);
+        SoTN_no3.InitializeEntity_no3(c, m);
         c.A0 = 0u | 0x0004u;
         c.V0 = 0u | 0x0004u;
         m.WriteU16((c.S0 + 0x80u), (ushort)c.V0);
@@ -1713,7 +1773,7 @@ public static partial class WidescreenPatch
         c.V0 = c.A0 << 1;
         c.A0 = c.S0 + 0u;
         c.RA = 0x801B9230u;
-        SoTN.DestroyEntity_no3(c, m);
+        SoTN_no3.DestroyEntity_no3(c, m);
         goto L801B94DC;
         L801B9238: ;
         c.V0 = c.V0 + c.A0;
@@ -1853,6 +1913,7 @@ public static partial class WidescreenPatch
         c.V0 = m.ReadU16((c.S0 + 0x30u));
         if (c.V0 == 0u) {
             c.A3 = c.A3 + 0x130u;
+            while ((int)c.A3 < 256 + StageMargin()) c.A3 = c.A3 + 0x26u;
             goto L801B941C;
         }
         c.A3 = c.A3 + 0x130u;
@@ -1899,7 +1960,7 @@ public static partial class WidescreenPatch
         m.WriteU16((c.A2 + 0x22u), (ushort)c.V1);
         m.WriteU16((c.A2 + 0x32u), (ushort)c.V0);
         c.A2 = m.ReadU32(c.A2);
-        if ((int)c.A3 > -StageMargin()) {
+        if ((int)c.A3 > -StageMargin() && c.A2 != 0u) {
             c.V0 = c.A3 + 0u;
             goto L801B9464;
         }
@@ -1954,7 +2015,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0xA6Cu;
         c.RA = 0x801B3A28u;
-        SoTN.InitializeEntity_np3(c, m);
+        SoTN_np3.InitializeEntity_np3(c, m);
         c.A0 = 0u | 0x0004u;
         c.V0 = 0u | 0x0004u;
         m.WriteU16((c.S0 + 0x80u), (ushort)c.V0);
@@ -1973,7 +2034,7 @@ public static partial class WidescreenPatch
         c.V0 = c.A0 << 1;
         c.A0 = c.S0 + 0u;
         c.RA = 0x801B3A64u;
-        SoTN.DestroyEntity_np3(c, m);
+        SoTN_np3.DestroyEntity_np3(c, m);
         goto L801B3D10;
         L801B3A6C: ;
         c.V0 = c.V0 + c.A0;
@@ -2093,7 +2154,7 @@ public static partial class WidescreenPatch
         c.A0 = c.A0 + 0x10ECu;
         c.A1 = c.S0 + 0u;
         c.RA = 0x801B3BFCu;
-        SoTN.AnimateEntity_np3(c, m);
+        SoTN_np3.AnimateEntity_np3(c, m);
         c.V0 = 0x6BCA0000u;
         c.A0 = 0x80070000u;
         c.A0 = (uint)(short)m.ReadU16((c.A0 + 0x308Eu));
@@ -2113,6 +2174,7 @@ public static partial class WidescreenPatch
         c.V0 = m.ReadU16((c.S0 + 0x30u));
         if (c.V0 == 0u) {
             c.A3 = c.A3 + 0x130u;
+            while ((int)c.A3 < 256 + StageMargin()) c.A3 = c.A3 + 0x26u;
             goto L801B3C50;
         }
         c.A3 = c.A3 + 0x130u;
@@ -2159,7 +2221,7 @@ public static partial class WidescreenPatch
         m.WriteU16((c.A2 + 0x22u), (ushort)c.V1);
         m.WriteU16((c.A2 + 0x32u), (ushort)c.V0);
         c.A2 = m.ReadU32(c.A2);
-        if ((int)c.A3 > -StageMargin()) {
+        if ((int)c.A3 > -StageMargin() && c.A2 != 0u) {
             c.V0 = c.A3 + 0u;
             goto L801B3C98;
         }
@@ -2199,7 +2261,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0xBBCu;
         c.RA = 0x801C12E8u;
-        SoTN.InitializeEntity_no4(c, m);
+        SoTN_no4.InitializeEntity_no4(c, m);
         c.A0 = 0u | 0x0004u;
         c.V0 = 0u | 0x0004u;
         m.WriteU16((c.S1 + 0x54u), (ushort)0u);
@@ -2219,7 +2281,7 @@ public static partial class WidescreenPatch
         c.V0 = c.A0 << 1;
         c.A0 = c.S1 + 0u;
         c.RA = 0x801C1328u;
-        SoTN.DestroyEntity_no4(c, m);
+        SoTN_no4.DestroyEntity_no4(c, m);
         goto L801C15DC;
         L801C1330: ;
         c.V0 = c.V0 + c.A0;
@@ -2259,7 +2321,7 @@ public static partial class WidescreenPatch
         c.S0 = m.ReadU32((c.S1 + 0x7Cu));
         c.A1 = c.S1 + 0u;
         c.RA = 0x801C13B0u;
-        SoTN.AnimateEntity_no4(c, m);
+        SoTN_no4.AnimateEntity_no4(c, m);
         c.V0 = m.ReadU16((c.S1 + 0x30u));
         c.V1 = m.ReadU8((c.S1 + 0x30u));
         c.A0 = 0x80070000u;
@@ -2473,7 +2535,7 @@ public static partial class WidescreenPatch
         c.A0 = 0x80180000u;
         c.A0 = c.A0 + 0x114Cu;
         c.RA = 0x801CA17Cu;
-        SoTN.InitializeEntity_cat(c, m);
+        SoTN_cat.InitializeEntity_cat(c, m);
         m.WriteU16((c.S0 + 0x54u), (ushort)0u);
         m.WriteU16((c.S0 + 0x56u), (ushort)0u);
         goto L801CA290;
@@ -2546,7 +2608,7 @@ public static partial class WidescreenPatch
         L801CA270: ;
         c.A0 = c.S0 + 0u;
         c.RA = 0x801CA278u;
-        SoTN.DestroyEntity_cat(c, m);
+        SoTN_cat.DestroyEntity_cat(c, m);
         goto L801CA290;
         L801CA280: ;
         c.V0 = m.ReadU16((c.S0 + 0x2Cu));
@@ -2557,5 +2619,556 @@ public static partial class WidescreenPatch
         c.S0 = m.ReadU32((c.SP + 0x10u));
         c.SP = c.SP + 0x18u;
         return;
+    }
+    const uint BackgroundPacketBase = 0x80300000;
+    const int BackgroundPacketCapacity = 2048;
+    const uint BackgroundPacketStride = 64;
+
+    readonly record struct BackgroundVertex(int X, int Y, ushort Uv, uint Color);
+    readonly record struct BackgroundQuad(BackgroundVertex A, BackgroundVertex B,
+        BackgroundVertex C, BackgroundVertex D, ushort Page, ushort Palette, ushort Order,
+        ushort Mode, bool Textured)
+    {
+        public int Left => Math.Min(Math.Min(A.X, B.X), Math.Min(C.X, D.X));
+        public int Right => Math.Max(Math.Max(A.X, B.X), Math.Max(C.X, D.X));
+        public BackgroundQuad Shift(int top, int bottom) => this with
+        {
+            A = A with { X = A.X + top }, B = B with { X = B.X + top },
+            C = C with { X = C.X + bottom }, D = D with { X = D.X + bottom }
+        };
+    }
+
+    static bool BackgroundPrimitive(IMemory m, uint p) => p >= PrimBufAddr &&
+        p < PrimBufAddr + 0x500 * PrimStride && (p - PrimBufAddr) % PrimStride == 0;
+
+    static BackgroundQuad ReadBackgroundQuad(IMemory m, uint p)
+    {
+        BackgroundVertex Vertex(uint offset) => new((short)m.ReadU16(p + offset + 4),
+            (short)m.ReadU16(p + offset + 6), m.ReadU16(p + offset + 8),
+            m.ReadU32(p + offset) & 0xFFFFFF);
+        return new(Vertex(4), Vertex(16), Vertex(28), Vertex(40), m.ReadU16(p + 26),
+            m.ReadU16(p + 14), m.ReadU16(p + 38), m.ReadU16(p + 50),
+            (m.ReadU8(p + 7) & 15) == 4);
+    }
+
+    static void EmitBackground(IMemory m, BackgroundQuad q, ref int count)
+    {
+        if (count >= BackgroundPacketCapacity || q.Order >= OtSize || (q.Mode & 8) != 0 ||
+            q.Right <= ViewLeft || q.Left >= ViewRight) return;
+        uint buffer = m.ReadU32(CurrentBufferPtr);
+        if (buffer != Buf(0) && buffer != Buf(1)) return;
+        uint p = BackgroundPacketBase + (buffer == Buf(1)
+            ? BackgroundPacketCapacity * BackgroundPacketStride : 0) + (uint)count++ * BackgroundPacketStride;
+        uint page = (uint)((q.Textured ? q.Page : 0) + (q.Mode & 0x60));
+        m.WriteU32(p + 4, 0xE1000000 | page | ((q.Mode & 0x400) != 0 ? 0x200u : 0));
+        m.WriteU32(p + 8, 0xE2000000);
+        uint cmd = q.Textured ? 0x3C000000u : 0x38000000u;
+        if ((q.Mode & 1) != 0) cmd |= 0x02000000;
+        if (q.Textured && (q.Mode & 4) == 0) cmd |= 0x01000000;
+        int bx = (q.Mode & 0x2080) == 0 ? (int)m.ReadU32(BackbufferX) : 0;
+        int by = (q.Mode & 0x2080) == 0 ? (int)m.ReadU32(BackbufferY) : 0;
+        uint cursor = p + 12;
+        void Write(BackgroundVertex v, int index)
+        {
+            m.WriteU32(cursor, v.Color | (index == 0 ? cmd : 0));
+            m.WriteU32(cursor + 4, (ushort)(v.X + bx) | ((uint)(ushort)(v.Y + by) << 16));
+            cursor += 8;
+            if (!q.Textured) return;
+            uint extra = index == 0 ? m.ReadU16(ClutIdsAddr + (uint)q.Palette * 2) : index == 1 ? page : 0;
+            m.WriteU32(cursor, v.Uv | (extra << 16));
+            cursor += 4;
+        }
+        Write(q.A, 0); Write(q.B, 1); Write(q.C, 2); Write(q.D, 3);
+        m.WriteU32(cursor, 0xE1000000);
+        cursor += 4;
+        AddPrim(m, buffer + OtOfs, q.Order, p, (cursor - p - 4) / 4);
+    }
+
+    static bool SameBackgroundRow(BackgroundQuad a, BackgroundQuad b) =>
+        a.A.Y == b.A.Y && a.B.Y == b.B.Y && a.C.Y == b.C.Y && a.D.Y == b.D.Y &&
+        a.Order == b.Order && a.Palette == b.Palette && a.Textured == b.Textured;
+
+    static void ExtendBackgroundRows(IMemory m, ReadOnlySpan<BackgroundQuad> quads,
+        int spacing, ref int count)
+    {
+        for (int i = 0; i < quads.Length; i++)
+        {
+            var q = quads[i];
+            if ((q.Mode & 8) != 0 || !q.Textured || q.B.X <= q.A.X || q.D.X <= q.C.X) continue;
+            bool left = true, right = true;
+            for (int j = 0; j < quads.Length; j++)
+            {
+                if (i == j || (quads[j].Mode & 8) != 0 || !SameBackgroundRow(q, quads[j])) continue;
+                if (quads[j].Left < q.Left) left = false;
+                if (quads[j].Right > q.Right) right = false;
+            }
+            int top = spacing > 0 ? spacing : q.B.X - q.A.X;
+            int bottom = spacing > 0 ? spacing : q.D.X - q.C.X;
+            if (left)
+                for (int n = 1; n <= BackgroundPacketCapacity; n++)
+                {
+                    var next = q.Shift(-n * top, -n * bottom);
+                    if (next.Right <= ViewLeft) break;
+                    EmitBackground(m, next, ref count);
+                }
+            if (right)
+                for (int n = 1; n <= BackgroundPacketCapacity; n++)
+                {
+                    var next = q.Shift(n * top, n * bottom);
+                    if (next.Left >= ViewRight) break;
+                    EmitBackground(m, next, ref count);
+                }
+        }
+    }
+
+    static BackgroundQuad BackgroundRect(BackgroundQuad q, int x, int y, int w, int h) => q with
+    {
+        A = q.A with { X = x, Y = y }, B = q.B with { X = x + w, Y = y },
+        C = q.C with { X = x, Y = y + h }, D = q.D with { X = x + w, Y = y + h }
+    };
+
+    static void ExtendCavernColumns(IMemory m, uint table, ReadOnlySpan<BackgroundQuad> quads,
+        int sx, int sy, ref int count, bool inverted = false)
+    {
+        if ((!inverted && sy >= 176) || quads.IsEmpty) return;
+        var template = quads[0] with { Mode = 0 };
+        for (int i = 0; i < 4; i++)
+        {
+            int x = (short)m.ReadU16(table + (uint)i * 6) - ((sx / 2) & 255);
+            int y = (short)m.ReadU16(table + (uint)i * 6 + 2) - sy / 2;
+            if (inverted) y = ((int)m.ReadU32(0x800730CC) - 256) / 2 + 122 -
+                (short)m.ReadU16(table + (uint)i * 6 + 2) - sy / 2;
+            int flip = m.ReadU16(table + (uint)i * 6 + 4);
+            if (y + 126 < 0 || y >= 224) continue;
+            int first = (int)Math.Floor((ViewLeft - x - 20) / 256.0);
+            int last = (int)Math.Ceiling((ViewRight - x) / 256.0);
+            for (int k = first; k <= last; k++)
+            {
+                int px = x + k * 256;
+                if (px >= -20 && px < 256) continue;
+                var q = BackgroundRect(template, px + ((flip & 1) != 0 ? 20 : 0),
+                    y + ((flip & 2) != 0 ? 0 : 126), (flip & 1) != 0 ? -20 : 20,
+                    (flip & 2) != 0 ? 126 : -126);
+                EmitBackground(m, q, ref count);
+            }
+        }
+    }
+
+    static void ExtendCavernWaterfalls(IMemory m, ReadOnlySpan<BackgroundQuad> quads, ref int count)
+    {
+        for (int i = 0; i < quads.Length; i++)
+        {
+            var q = quads[i];
+            if ((q.Mode & 8) != 0) continue;
+            bool duplicate = false;
+            for (int j = 0; j < i; j++)
+                if ((quads[j].Mode & 8) == 0 && SameBackgroundRow(q, quads[j]) &&
+                    (q.A.X - quads[j].A.X) % 256 == 0) duplicate = true;
+            if (duplicate) continue;
+            int first = (int)Math.Floor((ViewLeft - q.Right) / 256.0);
+            int last = (int)Math.Ceiling((ViewRight - q.Left) / 256.0);
+            for (int k = first; k <= last; k++)
+            {
+                var next = q.Shift(k * 256, k * 256);
+                if (next.A.X >= -2 && next.A.X < 256) continue;
+                EmitBackground(m, next, ref count);
+            }
+        }
+    }
+
+    static void ExtendEntranceBushes(IMemory m, ReadOnlySpan<BackgroundQuad> quads, ref int count)
+    {
+        for (int i = 0; i < quads.Length; i++)
+        {
+            var q = quads[i];
+            int period = q.Order switch { 0x5E => 128, 0x5B => 63, 0x5D => 160, 0x5C => 208, _ => 0 };
+            if (period == 0 || (q.Mode & 8) != 0) continue;
+            bool duplicate = false;
+            for (int j = 0; j < i; j++)
+            {
+                int dx = quads[j].A.X - q.A.X;
+                if (dx % period == 0 && q.Shift(dx, dx) == quads[j]) duplicate = true;
+            }
+            if (duplicate) continue;
+            int first = (int)Math.Floor((ViewLeft - q.Right) / (double)period);
+            int last = (int)Math.Ceiling((ViewRight - q.Left) / (double)period);
+            for (int k = first; k <= last; k++)
+            {
+                var next = q.Shift(k * period, k * period);
+                bool existing = false;
+                for (int j = 0; j < quads.Length; j++)
+                    if (next == quads[j]) { existing = true; break; }
+                if (!existing) EmitBackground(m, next, ref count);
+            }
+        }
+    }
+
+    static int BackgroundProjectionScale(int h, int depth)
+    {
+        if (h >= depth * 2) return 0x1FFFF;
+        int shift = System.Numerics.BitOperations.LeadingZeroCount((uint)depth) - 16;
+        ulong n = (ulong)h << shift, d = (ulong)depth << shift;
+        int index = Math.Clamp((int)((d - 0x7FC0) >> 7), 0, 256);
+        ulong u = (ulong)Math.Clamp((0x40000 / (index + 0x100) + 1) / 2 - 0x101, 0, 255) + 0x101;
+        d = (0x2000080UL - d * u) >> 8;
+        d = (0x80UL + d * u) >> 8;
+        return (int)Math.Min((n * d + 0x8000) >> 16, 0x1FFFF);
+    }
+
+    static void ExtendPerspectiveClouds(IMemory m, uint entity, string stage,
+        ReadOnlySpan<BackgroundQuad> quads, int scrollY, ref int count)
+    {
+        (uint uv, uint data) = stage switch
+        {
+            "dai" => (0x8018242Cu, 0x80182544u),
+            "rdai" => (0x80181BD8u, 0x80181CF0u),
+            "bo5" => (0x801818ECu, 0x80181A04u),
+            "rbo3" => (0x801812DCu, 0x801813F4u),
+            "top" => (0x80181BFCu, 0x80181CE4u),
+            "rtop" => (0x801815B4u, 0x8018169Cu),
+            _ => (0u, 0u)
+        };
+        if (data == 0 || quads.IsEmpty) return;
+        bool keep = stage is "top" or "rtop";
+        int layers = keep || (stage == "rdai" && m.ReadU16(entity + 0x30) != 0) ? 2 : 3;
+        int dz = keep ? 224 : 256, h = keep ? 320 : 256, start = keep ? 576 : 448;
+        int centerY = stage is "rdai" or "rbo3" ? 96 : 160;
+        int timer = (int)(m.ReadU32(0x8003C998) & 1);
+        for (int layer = 0; layer < layers; layer++)
+        {
+            uint descriptor = data + (uint)layer * 8;
+            uint pattern = m.ReadU32(descriptor);
+            if (pattern < 0x80180000 || pattern > 0x801FFF00) continue;
+            int y = (short)m.ReadU16(descriptor + 4) + (keep ? (0x340 - scrollY) >> 3 : 0);
+            int phase = m.ReadU16(entity + 0x8A + (uint)layer * 8);
+            int x = ((short)m.ReadU16(entity + 2) + (short)m.ReadU16(entity + 0x86 + (uint)layer * 8)) % 2048;
+            for (int row = 0; row < 8; row++)
+            {
+                int z = start + row * dz - phase % dz;
+                int near = BackgroundProjectionScale(h, z), far = BackgroundProjectionScale(h, z + dz);
+                int y0 = Math.Clamp(centerY + (int)(((long)y * near) >> 16), -1024, 1023);
+                int y1 = Math.Clamp(centerY + (int)(((long)y * far) >> 16), -1024, 1023);
+                if (y1 < 0) continue;
+                uint colors(int distance) => (uint)((byte)((((keep ? 15 : 8) << 16) - distance * (keep ? 475 : 160)) >> 12) |
+                    ((byte)((((keep ? 15 : 8) << 16) - distance * (keep ? 512 : 176)) >> 12) << 8) |
+                    ((byte)((((keep ? 15 : 8) << 16) - distance * (keep ? 402 : 128)) >> 12) << 16));
+                uint color0 = colors(z - start), color1 = colors(z - start + dz);
+                int first = (int)Math.Floor((((ViewLeft - 128) * 65536.0 / far) - x - 128) / 256);
+                int last = (int)Math.Ceiling((((ViewRight - 128) * 65536.0 / far) - x + 128) / 256);
+                for (int column = first; column <= last; column++)
+                {
+                    int kind = m.ReadU8(pattern + (uint)(((row + phase / dz) & 7) * 8 + (column & 7)));
+                    if (kind == 0 || kind > (keep ? 8 : 6)) continue;
+                    int tx = x + column * 256;
+                    int x0 = Math.Clamp(128 + (int)(((long)(tx - 128) * near) >> 16), -1024, 1023);
+                    int x1 = Math.Clamp(128 + (int)(((long)(tx + 128) * near) >> 16), -1024, 1023);
+                    int x2 = Math.Clamp(128 + (int)(((long)(tx - 128) * far) >> 16), -1024, 1023);
+                    int x3 = Math.Clamp(128 + (int)(((long)(tx + 128) * far) >> 16), -1024, 1023);
+                    if (x3 >= 0 && x2 <= 256) continue;
+                    uint texture = uv + (uint)kind * 8;
+                    ushort palette = keep ? (ushort)((kind < 5 ? 0x4A : 0x48) + timer) : quads[0].Palette;
+                    var q = new BackgroundQuad(new(x0, y0, m.ReadU16(texture), color0),
+                        new(x1, y0, m.ReadU16(texture + 2), color0),
+                        new(x2, y1, m.ReadU16(texture + 4), color1),
+                        new(x3, y1, m.ReadU16(texture + 6), color1), 15, palette,
+                        m.ReadU16(descriptor + 6), (ushort)(keep ? 0x15 : 4), true);
+                    EmitBackground(m, q, ref count);
+                }
+            }
+        }
+    }
+
+    static int PositiveMod(int value, int divisor)
+    {
+        int result = value % divisor;
+        return result < 0 ? result + divisor : result;
+    }
+
+    static void ExtendCavernBackdrop(IMemory m, uint entity, int scrollX, int scrollY, ref int count)
+    {
+        int timer = (int)m.ReadU32(0x8003C998);
+        int pulse = (timer & 0x80) == 0 ? 0 : (timer & 0x40) == 0 ? timer & 0x3F : 0x3F - (timer & 0x3F);
+        uint color = (uint)(0x80 + pulse) | 0x8000u | ((uint)(0x80 + pulse) << 16);
+        ushort parameters = m.ReadU16(entity + 0x30);
+        uint entry = 0x8018133Cu + (uint)(parameters & 0xFF) * 8;
+        for (int i = 0; i < parameters >> 8; i++, entry += 8)
+        {
+            int left = (short)m.ReadU16(entry) - scrollX;
+            int right = (short)m.ReadU16(entry + 2) - scrollX;
+            int top = Math.Max((short)m.ReadU16(entry + 4) - scrollY, 0);
+            int bottom = Math.Min((short)m.ReadU16(entry + 6) - scrollY, 224);
+            left = Math.Max(left, ViewLeft);
+            right = Math.Min(right, ViewRight);
+            if (left >= right || top >= bottom) continue;
+            for (int y = top; y < bottom;)
+            {
+                int v = PositiveMod(scrollY / 4 + y - 88, 70) + 0x81;
+                int height = Math.Min(bottom - y, 70 - (v - 0x81));
+                for (int x = left; x < right;)
+                {
+                    int u = PositiveMod((scrollX - 16) / 4 + x, 126) + 1;
+                    int width = Math.Min(right - x, 126 - (u - 1));
+                    if (x < 0) width = Math.Min(width, -x);
+                    else if (x < 256) width = Math.Min(width, 256 - x);
+                    var q = new BackgroundQuad(new(x, y, (ushort)(u | v << 8), color),
+                        new(x + width, y, (ushort)(u + width | v << 8), color),
+                        new(x, y + height, (ushort)(u | (v + height) << 8), color),
+                        new(x + width, y + height, (ushort)(u + width | (v + height) << 8), color),
+                        15, 0x85, 0x18, 4, true);
+                    if (x + width <= 0 || x >= 256) EmitBackground(m, q, ref count);
+                    x += width;
+                }
+                y += height;
+            }
+        }
+    }
+
+    const uint OuterWallSkyBounds = 0x80180ED4;
+    const uint OuterWallWeather = 0x80180EEC;
+    const uint OuterWallWaveOffsets = 0x801D635C;
+    const int OuterWallWaveRows = 13;
+    const int OuterWallWaveFirstPrim = 5;
+    const int InvertedOuterWallPrims = 64;
+
+    static bool OuterWallSkyRange(IMemory m, int param, int scrollX, int scrollY, out int xMin, out int xMax)
+    {
+        int x0 = (short)m.ReadU16(OuterWallSkyBounds + (uint)param * 4) - scrollX;
+        int x1 = (short)m.ReadU16(OuterWallSkyBounds + (uint)param * 4 + 2) - scrollX;
+        if (param == 4)
+        {
+            if (scrollY < 0x260) x0 += 0x50;
+            if (scrollY < 0x80) x0 += 0x10;
+            if (scrollY > 0x190) x1 = 0x7000;
+        }
+        if (param == 2 && scrollY > 0x1B0)
+        {
+            x0 -= 0x210;
+            x1 = 0x7000;
+        }
+
+        if (x0 < 0) x0 = 0;
+        xMax = 0xFF;
+        if (x1 + 0x20 > 0 && x1 < 0x100)
+        {
+            if (x1 < 0) x1 = 0;
+            if (x0 >= 0x100 && x1 < 0xE0) xMax = x1 + 0x20;
+        }
+        else
+        {
+            x1 = 0x7000;
+        }
+
+        xMin = Math.Min(x0, x1);
+        return xMin < 0x100;
+    }
+
+    static void ExtendOuterWallSky(IMemory m, uint entity, int scrollX, int scrollY, ref int count)
+    {
+        int index = (short)m.ReadU16(entity + EntPrimIndex);
+        if (index < 0 || index >= 0x400) return;
+        int param = m.ReadU16(entity + EntParams);
+        uint weather = m.ReadU32(OuterWallWeather);
+
+        Span<uint> prims = stackalloc uint[OuterWallWaveFirstPrim + OuterWallWaveRows];
+        int n = 0;
+        for (uint p = PrimBufAddr + (uint)index * PrimStride; p != 0 && n < prims.Length; p = m.ReadU32(p))
+            prims[n++] = p;
+        if (n < OuterWallWaveFirstPrim) return;
+        bool waves = weather != 2 && n == prims.Length;
+
+        if (OuterWallSkyRange(m, param, scrollX - 256, scrollY, out int left, out int leftEnd))
+        {
+            int a = Math.Max(left - 256, ViewLeft);
+            int b = leftEnd == 0xFF ? 0 : leftEnd - 256;
+            if (a < b) OuterWallSkyBand(m, prims[..n], weather, waves, a, b, false, ref count);
+        }
+
+        if (OuterWallSkyRange(m, param, scrollX + 256, scrollY, out int right, out int rightEnd))
+        {
+            int a = Math.Max(right + 256, 0xFF);
+            int b = Math.Min(rightEnd == 0xFF ? ViewRight : rightEnd + 256, ViewRight);
+            if (a < b) OuterWallSkyBand(m, prims[..n], weather, waves, a, b, true, ref count);
+        }
+    }
+
+    static void ExtendInvertedOuterWallSky(IMemory m, uint entity, ref int count)
+    {
+        int index = (short)m.ReadU16(entity + EntPrimIndex);
+        if (index < 0 || index >= 0x400) return;
+        Span<BackgroundQuad> quads = stackalloc BackgroundQuad[InvertedOuterWallPrims];
+        int n = 0;
+        for (uint p = PrimBufAddr + (uint)index * PrimStride; BackgroundPrimitive(m, p) && n < quads.Length; p = m.ReadU32(p))
+            quads[n++] = ReadBackgroundQuad(m, p);
+        if (n < OuterWallWaveFirstPrim) return;
+
+        for (int i = 0; i < 2; i++)
+        {
+            var q = quads[i];
+            if ((q.Mode & 8) != 0) continue;
+            EmitBackground(m, BackgroundRect(q, ViewLeft, q.A.Y, Margin, q.C.Y - q.A.Y), ref count);
+            EmitBackground(m, BackgroundRect(q, 256, q.A.Y, Margin, q.C.Y - q.A.Y), ref count);
+        }
+        ExtendBackgroundRows(m, quads[2..4], 0, ref count);
+        ExtendBackgroundRows(m, quads[OuterWallWaveFirstPrim..n], 0, ref count);
+    }
+
+    static void OuterWallSkyBand(IMemory m, ReadOnlySpan<uint> prims, uint weather, bool waves, int a, int b,
+        bool right, ref int count)
+    {
+        var sky = ReadBackgroundQuad(m, prims[0]);
+        EmitBackground(m, BackgroundRect(sky, a, sky.A.Y, b - a, sky.C.Y - sky.A.Y) with { Mode = 0 }, ref count);
+
+        if (weather != 1)
+        {
+            var glow = ReadBackgroundQuad(m, prims[1]);
+            EmitBackground(m, BackgroundRect(glow, a, glow.A.Y, b - a, glow.C.Y - glow.A.Y) with { Mode = DrawColors },
+                ref count);
+        }
+
+        var sea = ReadBackgroundQuad(m, prims[2]);
+        int seaTop = sea.A.Uv >> 8, seaBottom = sea.C.Uv >> 8;
+        for (int x = a; x < b;)
+        {
+            int boundary = ((x >> 7) + 1) << 7;
+            int end = Math.Min(b, boundary);
+            int u0 = x & 0x7F, u1 = end == boundary ? 0x7F : end & 0x7F;
+            EmitBackground(m, sea with
+            {
+                A = new(x, sea.A.Y, (ushort)(u0 | seaTop << 8), sea.A.Color),
+                B = new(end, sea.A.Y, (ushort)(u1 | seaTop << 8), sea.A.Color),
+                C = new(x, sea.C.Y, (ushort)(u0 | seaBottom << 8), sea.C.Color),
+                D = new(end, sea.C.Y, (ushort)(u1 | seaBottom << 8), sea.C.Color),
+                Mode = 0
+            }, ref count);
+            x = end;
+        }
+
+        if (!waves) return;
+        for (int row = 0; row < OuterWallWaveRows; row++)
+        {
+            var wave = ReadBackgroundQuad(m, prims[OuterWallWaveFirstPrim + row]);
+            int top = (short)m.ReadU16(OuterWallWaveOffsets + (uint)row * 2);
+            int bottom = (short)m.ReadU16(OuterWallWaveOffsets + (uint)(row + 1) * 2);
+            for (int column = 0;; column++)
+            {
+                int offset = right ? 0xEE + column * 0x7F : -0x10 - column * 0x7F;
+                if (right ? offset + Math.Min(top, bottom) >= b : offset + Math.Max(top, bottom) + 0x80 <= a) break;
+                OuterWallWave(m, wave, top + offset, bottom + offset, a, b, ref count);
+            }
+        }
+    }
+
+    static void OuterWallWave(IMemory m, BackgroundQuad wave, int top, int bottom, int a, int b, ref int count)
+    {
+        static (int X0, int U0, int X1, int U1) Clip(int x0, int a, int b)
+        {
+            int x1 = x0 + 0x80, u0 = 0x80, u1 = 0xFF;
+            if (a >= x0)
+            {
+                x0 = a;
+                u0 = Math.Max(0x80, 0xFF - (x1 - x0));
+            }
+            if (x1 > b)
+            {
+                u1 = Math.Max(0x80, 0xFF - (x1 - b));
+                x1 = b;
+            }
+            return (x0, u0, x1, u1);
+        }
+
+        var t = Clip(top, a, b);
+        var d = Clip(bottom, a, b);
+        if (t.X0 >= t.X1 && d.X0 >= d.X1) return;
+        int vTop = wave.A.Uv >> 8, vBottom = wave.C.Uv >> 8;
+        EmitBackground(m, wave with
+        {
+            A = new(t.X0, wave.A.Y, (ushort)(t.U0 | vTop << 8), wave.A.Color),
+            B = new(t.X1, wave.A.Y, (ushort)(t.U1 | vTop << 8), wave.A.Color),
+            C = new(d.X0, wave.C.Y, (ushort)(d.U0 | vBottom << 8), wave.C.Color),
+            D = new(d.X1, wave.C.Y, (ushort)(d.U1 | vBottom << 8), wave.C.Color),
+            Mode = 0
+        }, ref count);
+    }
+
+    static void ExtendStageBackgrounds(TilemapRenderedEvent e)
+    {
+        if (OriginalAspect || !DisplayModeHooks.IsStage || Margin <= 0) return;
+        var m = e.Memory;
+        if (m.ReadU32(0x800973EC) != 0) return;
+        string? stage = StageOverlay(m)?.Name.ToLowerInvariant();
+        if (stage == null) return;
+        int count = 0;
+        Span<BackgroundQuad> quads = stackalloc BackgroundQuad[128];
+        for (int i = StageEntityStart; i < TotalEntityCount; i++)
+        {
+            uint entity = PedAt(i), fn = m.ReadU32(entity + EntPfnUpdate);
+            if (fn == 0 || (m.ReadU32(entity + EntFlags) & 0x800000) == 0) continue;
+            bool Match(string name) => StageSym(m, name).Addr == fn;
+            bool columns = (stage == "no4" && Match("func_us_801C1C94")) ||
+                (stage == "rno4" && Match("func_801C5748"));
+            bool waterfalls = (stage == "no4" && Match("func_us_801C1EE4")) ||
+                (stage == "rno4" && Match("func_801C59AC"));
+            bool cavernBackdrop = stage == "no4" && Match("func_us_801C1844");
+            bool bushes = ((stage is "no3" or "np3") && Match("EntityBackgroundBushes")) ||
+                (stage == "rno3" && Match("func_801B0F50"));
+            bool warp = (stage == "wrp" && Match("EntityWarpRoom")) ||
+                (stage == "rwrp" && Match("EntityRWarpRoom"));
+            bool clouds = ((stage is "dai" or "bo5" or "rbo3" or "top" or "rtop") && Match("EntityClouds")) ||
+                (stage == "rdai" && Match("func_801C6FE4"));
+            bool rows = ((stage is "nz0" or "rnz0") && Match("EntityPurpleBrickScrollingBackground")) ||
+                ((stage is "nz1" or "rnz1") && Match("EntityBackgroundGears")) ||
+                ((stage is "cat" or "rcat") && (Match("EntityCavernBackgroundLossoth") || Match("EntityCavernBackgroundDiscusLord"))) ||
+                (stage == "lib" && (Match("EntityBackgroundBookcase") || Match("EntityBackgroundFurniture"))) ||
+                (stage == "rlib" && (Match("RLIB_EntityBackgroundBookcase") || Match("RLIB_EntityBackgroundFurniture"))) ||
+                ((stage is "no3" or "np3") && (Match("EntityBackgroundTrees") ||
+                    Match("EntityDistantBackgroundTrees"))) ||
+                (stage == "rno3" && Match("RNO3_EntityBackgroundTrees")) ||
+                (stage == "dre" && Match("EntityBackgroundClouds"));
+            bool corridor = (stage == "no0" && Match("func_us_801CC750")) ||
+                (stage == "rno0" && Match("func_801C08F8"));
+            bool outerWallSky = stage == "no1" && Match("func_us_801B6490");
+            bool invertedOuterWallSky = stage == "rno1" && Match("func_801A68AC");
+            if (!columns && !rows && !corridor && !waterfalls && !cavernBackdrop && !warp && !clouds && !bushes &&
+                !outerWallSky && !invertedOuterWallSky) continue;
+            if (cavernBackdrop)
+            {
+                ExtendCavernBackdrop(m, entity, e.ScrollX, e.ScrollY, ref count);
+                continue;
+            }
+            if (outerWallSky)
+            {
+                ExtendOuterWallSky(m, entity, e.ScrollX, e.ScrollY, ref count);
+                continue;
+            }
+            if (invertedOuterWallSky)
+            {
+                ExtendInvertedOuterWallSky(m, entity, ref count);
+                continue;
+            }
+            int index = (short)m.ReadU16(entity + 0x64);
+            if (index < 0 || index >= 0x400) continue;
+            uint p = PrimBufAddr + (uint)index * PrimStride;
+            int n = 0;
+            for (int visited = 0; BackgroundPrimitive(m, p) && visited < quads.Length; visited++)
+            {
+                byte type = (byte)(m.ReadU8(p + 7) & 15);
+                if (type is 3 or 4) quads[n++] = ReadBackgroundQuad(m, p);
+                p = m.ReadU32(p);
+            }
+            if (columns) ExtendCavernColumns(m, stage == "no4" ? 0x801814E4u : 0x80181428u,
+                quads[..n], e.ScrollX, e.ScrollY, ref count, stage == "rno4");
+            else if (waterfalls) ExtendCavernWaterfalls(m, quads[..n], ref count);
+            else if (clouds) ExtendPerspectiveClouds(m, entity, stage, quads[..n], e.ScrollY, ref count);
+            else if (bushes) ExtendEntranceBushes(m, quads[..n], ref count);
+            else if (!warp) ExtendBackgroundRows(m, quads[..n], corridor ? 30 : 0, ref count);
+            if (stage == "dre" || warp)
+                for (int j = 0; j < n; j++)
+                {
+                    var q = quads[j];
+                    if (q.Textured || q.Left != 0 || q.Right != 256) continue;
+                    EmitBackground(m, BackgroundRect(q, ViewLeft, q.A.Y, Margin, q.C.Y - q.A.Y), ref count);
+                    EmitBackground(m, BackgroundRect(q, 256, q.A.Y, Margin, q.C.Y - q.A.Y), ref count);
+                }
+        }
     }
 }

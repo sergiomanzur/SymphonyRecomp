@@ -118,27 +118,24 @@ public sealed class TrackerOverlayPanel : IPanel
     {
         if (_loaded) return;
         _loaded = true;
-        var v = RecompOne.Runtime.Runtime.View;
-        _sectioning = v.GetBool("Tracker.Sectioning", true);
-        _fixedIconSize = v.GetBool("Tracker.FixedIconSize", false);
-        _showJp = v.GetBool("Tracker.ShowJp", false);
-        _showHand = v.GetBool("Tracker.ShowHand", false);
-        _showBody = v.GetBool("Tracker.ShowBody", false);
-        _showProgress = v.GetBool("Tracker.ShowProgress", false);
-        _columns = Math.Clamp(v.GetInt("Tracker.Columns", 5), 1, 12);
+        _sectioning = TrackerOptions.Sectioning;
+        _fixedIconSize = TrackerOptions.FixedIconSize;
+        _showJp = TrackerOptions.ShowJp;
+        _showHand = TrackerOptions.ShowHand;
+        _showBody = TrackerOptions.ShowBody;
+        _showProgress = TrackerOptions.ShowProgress;
+        _columns = TrackerOptions.Columns;
     }
 
     void Persist()
     {
-        var v = RecompOne.Runtime.Runtime.View;
-        v.SetBool("Tracker.Sectioning", _sectioning);
-        v.SetBool("Tracker.FixedIconSize", _fixedIconSize);
-        v.SetBool("Tracker.ShowJp", _showJp);
-        v.SetBool("Tracker.ShowHand", _showHand);
-        v.SetBool("Tracker.ShowBody", _showBody);
-        v.SetBool("Tracker.ShowProgress", _showProgress);
-        v.SetInt("Tracker.Columns", _columns);
-        RecompOne.Runtime.Runtime.SaveView();
+        TrackerOptions.Sectioning.Value = _sectioning;
+        TrackerOptions.FixedIconSize.Value = _fixedIconSize;
+        TrackerOptions.ShowJp.Value = _showJp;
+        TrackerOptions.ShowHand.Value = _showHand;
+        TrackerOptions.ShowBody.Value = _showBody;
+        TrackerOptions.ShowProgress.Value = _showProgress;
+        TrackerOptions.Columns.Value = _columns;
     }
 
     void DrawSection(IMemory m, string title, Tracker.Entry[] items)

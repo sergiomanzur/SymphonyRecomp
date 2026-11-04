@@ -28,6 +28,12 @@ public static partial class WidescreenPatch
     public static bool TransparentWaterWide_no3Hook(CpuContext c, IMemory m) => Wide(TransparentWaterWide_no3, c, m);
     public static bool TransparentWaterWide_np3Hook(CpuContext c, IMemory m) => Wide(TransparentWaterWide_np3, c, m);
     public static bool WaterSurface801C12B0Wide_no4Hook(CpuContext c, IMemory m) => Wide(WaterSurface801C12B0Wide_no4, c, m);
+   //not really necessary for water shit but anyways just to be safe
+    public static bool WaterSurface801C4DD0Wide_rno4Hook(CpuContext c, IMemory m) => Wide(WaterSurface801C4DD0Wide_rno4, c, m);
+    public static bool WaterBody801C15F8Wide_no4Hook(CpuContext c, IMemory m) => Wide(WaterBody801C15F8Wide_no4, c, m);
+    public static bool WaterBody801C5118Wide_rno4Hook(CpuContext c, IMemory m) => Wide(WaterBody801C5118Wide_rno4, c, m);
+    public static bool WaterSurface8019D1D4Wide_bo3Hook(CpuContext c, IMemory m) => Wide(WaterSurface8019D1D4Wide_bo3, c, m);
+    public static bool WaterBody8019D51CWide_bo3Hook(CpuContext c, IMemory m) => Wide(WaterBody8019D51CWide_bo3, c, m);
     public static bool LavaGlowWide_catHook(CpuContext c, IMemory m) => Wide(LavaGlowWide_cat, c, m);
     public static bool CamColWide(CpuContext c, IMemory m) => Wide(CamCol, c, m);
 

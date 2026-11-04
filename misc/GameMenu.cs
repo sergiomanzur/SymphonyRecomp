@@ -23,8 +23,7 @@ public static class GameMenu
 
     public static void Register()
     {
-        MenuRegistry.Menu("menu.system", MenuRegistry.OrderSystem)
-            .Item("menu.system.soft_reset", SoftReset).Order(MainMenuBar.SystemSoftReset).Enabled(Cheats.InPlay);
+        MenuRegistry.Menu("menu.system").Item("menu.system.soft_reset", SoftReset).Before("menu.system.hard_reset").Enabled(Cheats.InPlay);
 
         Event.AddListener<VSyncEvent>(OnVSync);
     }

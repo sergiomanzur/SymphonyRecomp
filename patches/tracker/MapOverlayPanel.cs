@@ -7,8 +7,6 @@ using ImGuiNET;
 using RecompOne.Runtime.Host;
 using RecompOne.Runtime.Host.Window;
 using RecompOne.Runtime.Memory;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Recompiled;
 
@@ -273,15 +271,12 @@ public sealed class MapOverlayPanel : IPanel
     {
         if (_loaded) return;
         _loaded = true;
-        var v = RecompOne.Runtime.Runtime.View;
-        _checkSet = Math.Clamp(v.GetInt("Map.CheckSet", 2), 0, 6);
+        _checkSet = TrackerOptions.MapCheckSet;
     }
 
     void Persist()
     {
-        var v = RecompOne.Runtime.Runtime.View;
-        v.SetInt("Map.CheckSet", _checkSet);
-        RecompOne.Runtime.Runtime.SaveView();
+        TrackerOptions.MapCheckSet.Value = _checkSet;
     }
 
     void EnsureTextures()
@@ -305,10 +300,8 @@ public sealed class MapOverlayPanel : IPanel
             st.CopyTo(ms);
             try
             {
-                using var img = Image.Load<Rgba32>(ms.ToArray());
-                var rgba = new byte[img.Width * img.Height * 4];
-                img.CopyPixelDataTo(rgba);
-                return HostWindow.UploadTexture(rgba, img.Width, img.Height);
+                var img = RgbaImage.Load(ms.ToArray());
+                return HostWindow.UploadTexture(img.Pixels, img.Width, img.Height);
             }
             catch { return 0; }
         }

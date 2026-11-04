@@ -6,14 +6,7 @@ namespace Recompiled;
 
 public static partial class WidescreenPatch
 {
-    public static int Margin
-    {
-        get
-        {
-            EnsureInitialized();
-            return OriginalAspect ? 0 : StageMargin();
-        }
-    }
+    public static int Margin => OriginalAspect ? 0 : StageMargin();
 
     public static bool Extended => Margin > 0;
 

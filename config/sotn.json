@@ -7,8 +7,11 @@
   "cue": "../disc/Castlevania - Symphony of the Night (USA).cue",
   "funcMap": "funcmaps/main.json",
   "debug": false,
-  "addressComments": true,
-  "disasmComments": true,
+  "disableHle": [
+    "libpress"
+  ],
+  "addressComments": false,
+  "disasmComments": false,
   "functions": [],
   "overlays": [
     {
@@ -1635,6 +1638,54 @@
       "target": "Recompiled.WidescreenPatch.PreDestroyPlayerEntity"
     },
     {
+      "overlay": "ric",
+      "function": "DestroyEntity",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.PreDestroyPlayerEntity"
+    },
+    {
+      "overlay": "ric",
+      "function": "RicStepSlide",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.RicStepSlideWide"
+    },
+    {
+      "overlay": "ric",
+      "function": "RicCheckInput",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.RicCheckInputWide"
+    },
+    {
+      "overlay": "ric",
+      "function": "RicEntitySubwpnCross",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.RicEntitySubwpnCrossWide"
+    },
+    {
+      "overlay": "ric",
+      "function": "RicEntitySubwpnReboundStone",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.RicEntitySubwpnReboundStoneWide"
+    },
+    {
+      "overlay": "ric",
+      "function": "RicEntitySubwpnAgunea",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.RicEntitySubwpnAguneaWide"
+    },
+    {
+      "overlay": "nz0",
+      "function": "DestroyEntity",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.PreDestroyFadingActor"
+    },
+    {
+      "overlay": "dai",
+      "function": "DestroyEntity",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.PreDestroyFadingActor"
+    },
+    {
       "overlay": "dra",
       "function": "EntityNumberMovesToHpMeter",
       "mode": "pre",
@@ -1683,6 +1734,30 @@
       "target": "Recompiled.WidescreenPatch.TransparentWaterWide_no3Hook"
     },
     {
+      "overlay": "no3",
+      "function": "EntityForegroundTree",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.ForegroundTreeWideHook"
+    },
+    {
+      "overlay": "no3",
+      "function": "EntityFoliageMaker",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.FoliageMakerWideHook"
+    },
+    {
+      "overlay": "no3",
+      "function": "EntityBackgroundPineTrees",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.BackgroundPineTreesWideHook"
+    },
+    {
+      "overlay": "no3",
+      "function": "EntityDistantTreeMaker",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.DistantTreeMakerWideHook"
+    },
+    {
       "overlay": "np3",
       "function": "EntityTransparentWater",
       "mode": "pre",
@@ -1693,6 +1768,36 @@
       "function": "func_us_801C12B0",
       "mode": "pre",
       "target": "Recompiled.WidescreenPatch.WaterSurface801C12B0Wide_no4Hook"
+    },
+    {
+      "overlay": "no4",
+      "function": "func_us_801C15F8",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.WaterBody801C15F8Wide_no4Hook"
+    },
+    {
+      "overlay": "rno4",
+      "function": "func_801C4DD0",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.WaterSurface801C4DD0Wide_rno4Hook"
+    },
+    {
+      "overlay": "rno4",
+      "function": "func_801C5118",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.WaterBody801C5118Wide_rno4Hook"
+    },
+    {
+      "overlay": "bo3",
+      "function": "func_8019D1D4",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.WaterSurface8019D1D4Wide_bo3Hook"
+    },
+    {
+      "overlay": "bo3",
+      "function": "func_8019D51C",
+      "mode": "pre",
+      "target": "Recompiled.WidescreenPatch.WaterBody8019D51CWide_bo3Hook"
     },
     {
       "overlay": "cat",
@@ -2279,6 +2384,1278 @@
       "function": "HitDetection",
       "mode": "pre",
       "target": "Recompiled.WidescreenPatch.HitDetectionWide"
+    },
+    {
+      "overlay": "dra",
+      "function": "func_801080DC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.FontPatches.PrepareCdGraphics"
+    },
+    {
+      "overlay": "sel",
+      "function": "func_801B2D6C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.FontPatches.PrepareMenuPalette"
+    },
+    {
+      "overlay": "main",
+      "function": "FntLoad",
+      "mode": "pre",
+      "target": "Recompiled.Translation.FontPatches.PrepareDebugFont"
+    },
+    {
+      "overlay": "dra",
+      "function": "func_80106A28",
+      "mode": "pre",
+      "target": "Recompiled.Translation.FontPatches.PrepareBiosFallback"
+    },
+    {
+      "overlay": "main",
+      "function": "main",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.PrepareMain"
+    },
+    {
+      "overlay": "dra",
+      "function": "MainGame",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.PrepareDra"
+    },
+    {
+      "overlay": "dra",
+      "function": "CopyStageOvlCallback",
+      "mode": "post",
+      "target": "Recompiled.Translation.TextPatches.AfterStageCopy"
+    },
+    {
+      "overlay": "dra",
+      "function": "CopyRicOvlCallback",
+      "mode": "post",
+      "target": "Recompiled.Translation.TextPatches.AfterRicCopy"
+    },
+    {
+      "overlay": "dra",
+      "function": "CopySupportOvlCallback",
+      "mode": "post",
+      "target": "Recompiled.Translation.TextPatches.AfterSupportCopy"
+    },
+    {
+      "overlay": "dra",
+      "function": "LoadFileSimToMem",
+      "mode": "post",
+      "target": "Recompiled.Translation.TextPatches.AfterSimLoad"
+    },
+    {
+      "overlay": "main",
+      "function": "Krom2RawAdd",
+      "mode": "pre",
+      "target": "Recompiled.Translation.FontPatches.KromGlyph"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5460",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_CutsceneUnk1"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A54B4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_SetCutsceneScript"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5678",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_CutsceneUnk3"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A56D4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_CutsceneUnk4"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A578C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_DrawCutsceneActorName"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5910",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.func_801A5910"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A593C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.func_801A593C_bo2"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5BE8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_CutsceneSkip"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5CC8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_ScaleCutsceneAvatar"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801A5DCC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.func_801A5DCC"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801AD754",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_EntityRelicOrb"
+    },
+    {
+      "overlay": "bo2",
+      "address": "0x801AE340",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo2.BO2_EntityMessageBox"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A459C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_CutsceneUnk1"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A45F0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_SetCutsceneScript"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A47B4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_CutsceneUnk3"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A4810",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_CutsceneUnk4"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A48C8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_DrawCutsceneActorName"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A4A4C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.func_801A4A4C"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A4A78",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_CutsceneRun"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A4D3C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_ScaleCutsceneAvatar"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801A4E40",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.func_801A4E40"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801ACC98",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_EntityRelicOrb"
+    },
+    {
+      "overlay": "bo5",
+      "address": "0x801AD884",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo5.BO5_EntityMessageBox"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018DF0C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.CutsceneUnk1_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018DF60",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.SetCutsceneScript_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E124",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.CutsceneUnk3_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E180",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.CutsceneUnk4_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E238",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.DrawCutsceneActorName_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E3BC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.SetCutsceneEnd_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E3E8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.CutsceneRun_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E6C4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.ScaleCutsceneAvatar_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E7C8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.CEN_EntityCutscene"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x8018E810",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.func_8018E810_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x80196F30",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.EntityRelicOrb_cen"
+    },
+    {
+      "overlay": "cen",
+      "address": "0x80197B28",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_cen.EntityMessageBox_cen"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C3F48",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.CutsceneUnk1_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C3F9C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.SetCutsceneScript_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C4160",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.CutsceneUnk3_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C41BC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.CutsceneUnk4_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C4274",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.DrawCutsceneActorName_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C43F8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.SetCutsceneEnd_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C4424",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.CutsceneRun_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C4700",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.ScaleCutsceneAvatar_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801C4804",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.DAI_EntityCutsceneDialogue"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801CC06C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.EntityRelicOrb_dai"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801CCC64",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dai.EntityMessageBox_dai"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194774",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.CutsceneUnk1_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x801947C8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.SetCutsceneScript_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x8019498C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.CutsceneUnk3_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x801949E8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.CutsceneUnk4_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194AA0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.DrawCutsceneActorName_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194C24",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.SetCutsceneEnd_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194C50",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.CutsceneRun_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194F14",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.CutsceneSkip_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x80194FF4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.ScaleCutsceneAvatar_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x801950F8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.DRE_EntityCutsceneDialogue"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x8019D074",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.EntityRelicOrb_dre"
+    },
+    {
+      "overlay": "dre",
+      "address": "0x8019DC6C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_dre.EntityMessageBox_dre"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B11A0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.func_us_801B11A0"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B95EC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.CutsceneUnk1_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9640",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.SetCutsceneScript_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9804",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.CutsceneUnk3_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9860",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.CutsceneUnk4_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9918",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.DrawCutsceneActorName_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9A9C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.SetCutsceneEnd_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9AC8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.CutsceneRun_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9D74",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.CutsceneSkip_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9E54",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.ScaleCutsceneAvatar_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801B9F58",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.LIB_EntityCutscene"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801C769C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.EntityRelicOrb_lib"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801C8294",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_lib.EntityMessageBox_lib"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018AFC4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.CutsceneUnk1_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B018",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.SetCutsceneScript_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B1DC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.CutsceneUnk3_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B238",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.CutsceneUnk4_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B2F0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.DrawCutsceneActorName_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B474",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.SetCutsceneEnd_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B4A0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.CutsceneRun_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B74C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.ScaleCutsceneAvatar_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x8018B850",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.MAR_EntityCutscene"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x80193054",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.EntityRelicOrb_mar"
+    },
+    {
+      "overlay": "mar",
+      "address": "0x80193C40",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_mar.EntityMessageBox_mar"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE544",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.CutsceneUnk1_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE598",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.SetCutsceneScript_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE75C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.CutsceneUnk3_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE7BC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.CutsceneUnk4_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE870",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.DrawCutsceneActorName_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BE9F4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.SetCutsceneEnd_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BEA20",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.CutsceneRun_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BECCC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.CutsceneSkip_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BEDAC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.ScaleCutsceneAvatar_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801BEEB0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.NO3_EntityCutscene"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801C7930",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.EntityRelicOrb_no3"
+    },
+    {
+      "overlay": "no3",
+      "address": "0x801C8528",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no3.EntityMessageBox_no3"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9538",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.CutsceneUnk1_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9568",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.SetCutsceneScript_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9708",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.CutsceneUnk3_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9764",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.CutsceneUnk4_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9800",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.DrawCutsceneActorName_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9950",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.ScaleCutsceneAvatar_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801C9A54",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.NO4_EntityCutscene"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801D06D4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.EntityRelicOrb_no4"
+    },
+    {
+      "overlay": "no4",
+      "address": "0x801D12CC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_no4.EntityMessageBox_no4"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B74CC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.CutsceneUnk1_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B7520",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.SetCutsceneScript_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B76E4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.CutsceneUnk3_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B7740",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.CutsceneUnk4_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B77F8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.DrawCutsceneActorName_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B797C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.SetCutsceneEnd_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B79A8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.CutsceneRun_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B7C54",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.ScaleCutsceneAvatar_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801B7D58",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.NZ0_EntityCutscene"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801BF5B8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.EntityRelicOrb_nz0"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801C01B0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_nz0.EntityMessageBox_nz0"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x8019FD70",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_CutsceneUnk1"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x8019FDC4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.func_8019FDC4_rbo2"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x8019FF88",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_CutsceneUnk3"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x8019FFE4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_CutsceneUnk4"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A009C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_DrawCutsceneActorName"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A0220",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.func_801A0220"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A024C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_CutsceneRun"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A0528",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_ScaleCutsceneAvatar"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A062C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.func_801A062C"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A7B64",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.func_801A7B64"
+    },
+    {
+      "overlay": "rbo2",
+      "address": "0x801A8750",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo2.RBO2_EntityMessageBox"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A1BE0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.func_801A1BE0"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A1C30",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_SetCutsceneScript"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A1DF4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_CutsceneUnk3"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A1E50",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_CutsceneUnk4"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A1F08",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_DrawCutsceneActorName"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A208C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.func_801A208C"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A20B8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_CutsceneRun"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A2394",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_CutsceneSkip"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A2474",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_ScaleCutsceneAvatar"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801A2578",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.func_801A2578"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801AB5A0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.func_801AB5A0_rbo6"
+    },
+    {
+      "overlay": "rbo6",
+      "address": "0x801AC18C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rbo6.RBO6_EntityMessageBox"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019D6C8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_CutsceneUnk1"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019D71C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_SetCutsceneScript"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019D8E0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_CutsceneUnk3"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019D93C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_CutsceneUnk4"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019D9F4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_DrawCutsceneActorName"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019DB78",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.func_8019DB78"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019DBA4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.func_8019DBA4_rcen"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019DE80",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_CutsceneSkip"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019DF60",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_ScaleCutsceneAvatar"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x8019E064",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.func_8019E064"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x801A6550",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_EntityRelicOrb"
+    },
+    {
+      "overlay": "rcen",
+      "address": "0x801A7148",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_rcen.RCEN_EntityMessageBox"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B18F4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.SEL_ClearBackbuffer"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B5A7C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.func_801B5A7C"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B60D4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.func_801B60D4"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B642C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.CutsceneUnk1_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B6480",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.SetCutsceneScript_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B6648",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.CutsceneUnk3_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B66A4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.CutsceneUnk4_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B675C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.DrawCutsceneActorName_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B68E0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.SetCutsceneEnd_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B690C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.ScaleCutsceneAvatar_sel"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B69F8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.SEL_EntityCutscene"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B76F0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.func_801B76F0"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B786C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.func_801B786C"
+    },
+    {
+      "overlay": "sel",
+      "address": "0x801B79D4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_sel.func_801B79D4"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8984",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.CutsceneUnk1_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A89D8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.SetCutsceneScript_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8B9C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.CutsceneUnk3_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8BF8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.CutsceneUnk4_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8CB0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.DrawCutsceneActorName_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8E34",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.SetCutsceneEnd_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A8E60",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.CutsceneRun_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A910C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.ScaleCutsceneAvatar_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801A9210",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.ST0_EntityCutscene"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801AF774",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.func_801AF774"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801B0180",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.ClearScreen"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801B101C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.func_801B101C"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801B1198",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.func_801B1198"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801B1298",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.func_801B1298_st0"
+    },
+    {
+      "overlay": "st0",
+      "address": "0x801B7308",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_st0.EntityRelicOrb_st0"
+    },
+    {
+      "overlay": "dra",
+      "function": "CdSoundCommand4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.DialogueAudio.StartVoice"
+    },
+    {
+      "overlay": "sel",
+      "function": "func_801B24F8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MenuText"
+    },
+    {
+      "overlay": "sel",
+      "function": "func_801B248C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MenuText"
+    },
+    {
+      "overlay": "are",
+      "address": "0x801BF3B0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "dai",
+      "address": "0x801CCC64",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "lib",
+      "address": "0x801C8294",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "no0",
+      "address": "0x801CB0B8",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "no1",
+      "address": "0x801C7A1C",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "nz0",
+      "address": "0x801C01B0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "rno0",
+      "address": "0x801BE000",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "rnz0",
+      "address": "0x801B38E0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.TextPatches.MessageBox"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7420",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.CutsceneUnk1_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7474",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.SetCutsceneScript_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7638",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.CutsceneUnk3_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7698",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.CutsceneUnk4_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7750",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.DrawCutsceneActorName_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A78D4",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.SetCutsceneEnd_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7900",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.CutsceneRun_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7BDC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.CutsceneSkip_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7CBC",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.ScaleCutsceneAvatar_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801A7DC0",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.func_us_801A7DC0"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801AFC38",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.EntityRelicOrb_bo6"
+    },
+    {
+      "overlay": "bo6",
+      "address": "0x801B0824",
+      "mode": "pre",
+      "target": "Recompiled.Translation.ScriptFunctions_bo6.EntityMessageBox_bo6"
     }
   ]
 }

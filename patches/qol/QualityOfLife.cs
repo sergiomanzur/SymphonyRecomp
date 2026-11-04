@@ -1,8 +1,32 @@
 ﻿using RecompOne.Runtime.Context;
 using RecompOne.Runtime.Memory;
+using RecompOne.Runtime.Config;
 using Sotn;
 
 namespace Recompiled;
+
+public static class QualityOfLifeOptions
+{
+    public static readonly Option<bool> ColorBlind = Options.Bool("qol.color_blind");
+    public static readonly Option<bool> RemoveFlashing = Options.Bool("qol.remove_flashing");
+    public static readonly Option<bool> BugFixes = Options.Bool("qol.bug_fixes");
+    public static readonly Option<bool> ClearFile = Options.Bool("qol.clear_file");
+    public static readonly Option<bool> AntiFreeze = Options.Bool("qol.anti_freeze");
+    public static readonly Option<bool> InfiniteWingSmash = Options.Bool("qol.infinite_wing_smash");
+    public static readonly Option<bool> UseEasySpellInput = Options.Bool("qol.easy_spell_input");
+    public static readonly Option<bool> IncreaseInvincibilityFrames =
+        Options.Bool("qol.invincibility_frames");
+
+    public static readonly Option<bool> SkipPrologue = Options.Bool("qol.skip_prologue");
+
+    public static readonly Option<bool> RestoreFairySong = Options.Bool("qol.fairy_song");
+
+    public static IEnumerable<Option<bool>> All =>
+    [
+        ColorBlind, RemoveFlashing, BugFixes, ClearFile, AntiFreeze, InfiniteWingSmash, UseEasySpellInput,
+        IncreaseInvincibilityFrames, SkipPrologue, RestoreFairySong
+    ];
+}
 
 internal class QualityOfLife
 {
@@ -14,47 +38,28 @@ internal class QualityOfLife
     public static bool InfiniteWingSmash;
     public static bool UseEasySpellInput;
     public static bool IncreaseInvincibilityFrames;
+    public static bool SkipPrologue;
 
     /* Enhancements */
     public static bool RestoreFairySong;
 
     public static void Load()
     {
-        var v = RecompOne.Runtime.Runtime.View;
-
         /* Toggles */
-        ColorBlind = v.GetBool("QolColorBlind");
-        RemoveFlashing = v.GetBool("QolRemoveFlashing");
-        BugFixes = v.GetBool("QolBugFixes");
-        ClearFile = v.GetBool("QolClearFile");
-        AntiFreeze = v.GetBool("QolAntiFreeze");
-        InfiniteWingSmash = v.GetBool("QolInfiniteWingSmash");
-        UseEasySpellInput = v.GetBool("QolUseEasySpellInput");
-        IncreaseInvincibilityFrames = v.GetBool("QolIncreaseInvincibilityFrames");
+        ColorBlind = QualityOfLifeOptions.ColorBlind;
+        RemoveFlashing = QualityOfLifeOptions.RemoveFlashing;
+        BugFixes = QualityOfLifeOptions.BugFixes;
+        ClearFile = QualityOfLifeOptions.ClearFile;
+        AntiFreeze = QualityOfLifeOptions.AntiFreeze;
+        InfiniteWingSmash = QualityOfLifeOptions.InfiniteWingSmash;
+        UseEasySpellInput = QualityOfLifeOptions.UseEasySpellInput;
+        IncreaseInvincibilityFrames = QualityOfLifeOptions.IncreaseInvincibilityFrames;
+        SkipPrologue = QualityOfLifeOptions.SkipPrologue;
 
         /* Enhancements */
-        RestoreFairySong = v.GetBool("QolRestoreFairySong");
+        RestoreFairySong = QualityOfLifeOptions.RestoreFairySong;
     }
 
-    public static void Save()
-    {
-        var v = RecompOne.Runtime.Runtime.View;
-
-        /* Toggles */
-        v.SetBool("QolColorBlind", ColorBlind);
-        v.SetBool("QolRemoveFlashing", RemoveFlashing);
-        v.SetBool("QolBugFixes", BugFixes);
-        v.SetBool("QolClearFile", ClearFile);
-        v.SetBool("QolAntiFreeze", AntiFreeze);
-        v.SetBool("QolInfiniteWingSmash", InfiniteWingSmash);
-        v.SetBool("QolUseEasySpellInput", UseEasySpellInput);
-        v.SetBool("QolIncreaseInvincibilityFrames", IncreaseInvincibilityFrames);
-
-        /* Enhancements */
-        v.SetBool("QolRestoreFairySong", RestoreFairySong);
-
-        RecompOne.Runtime.Runtime.SaveView();
-    }
     //note to eldrich from flaffy, later if possible try using the Pallete class, it has some helper functions to easy this out!
     public static void Apply(CpuContext c, IMemory m)
     {
@@ -184,10 +189,10 @@ internal class QualityOfLife
                 if (EnactJump == true)
                 {
                     c.A0 = 1;
-                    SoTN.HandleGravityBootsMP(c, m);
+                    SoTN_dra.HandleGravityBootsMP(c, m);
                     if (c.V0 == 0)
                     {
-                        SoTN.DoGravityJump(c, m);
+                        SoTN_dra.DoGravityJump(c, m);
                     }
                 }
             }
