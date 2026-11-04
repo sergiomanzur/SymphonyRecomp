@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using RecompOne.Runtime.Gpu.Hle;
+using RecompOne.Runtime.Hle;
 using RecompOne.Runtime.Modding;
 
 namespace DraculaMod;
