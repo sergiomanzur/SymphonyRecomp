@@ -58,6 +58,9 @@
   <!-- Assets to copy to the device at runtime -->
   <ItemGroup>
     <AndroidAsset Include="assets\**\*" />
+    <!-- RoomFill reads its JSON through Assembly.GetExecutingAssembly(); the PNGs are
+         already picked up by the SDK's default EmbeddedResource glob. -->
+    <EmbeddedResource Include="assets\extension\room_fills.json" />
     <AndroidAsset Include="config\**\*" />
     <AndroidAsset Include="Android\*.png" />
     <!-- The disc is deliberately NOT packaged. Bundling it made the APK ~470 MB and baked the
