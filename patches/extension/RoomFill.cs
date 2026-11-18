@@ -580,6 +580,7 @@ public static class RoomFills
                 AllowTrailingCommas = true,
             });
 
+            Console.WriteLine($"[RoomFills] loaded {doc?.Fills?.Count ?? 0} fill(s)");
             foreach (var fill in doc?.Fills ?? [])
             {
                 fill.TileData = ParseTiles(fill.Tiles);
